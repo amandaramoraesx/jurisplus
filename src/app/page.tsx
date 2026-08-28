@@ -1,69 +1,179 @@
-import Image from "next/image";
+import { prisma } from "@/lib/prisma";
+import { marcarPresenca, addNota, deleteNota } from "./actions";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+function todayDateOnly() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+export default async function DashboardPage() {
+  const hoje = todayDateOnly();
+
+  const disciplinas = await prisma.disciplina.findMany({
+    orderBy: { nome: "asc" },
+    include: {
+      professor: true,
+      aulas: true,
+      presencas: true,
+      notas: true,
+    },
+  });
+
+  const presencasHoje = await prisma.presenca.findMany({
+    where: { data: hoje },
+  });
+  const presencaHojeMap = new Map(presencasHoje.map((p) => [p.disciplinaId, p.presente]));
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-2xl font-bold">Início</h1>
+        <p className="text-sm text-foreground/60">
+          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(hoje)}
+        </p>
+      </div>
+
+      <section className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3">
+        <h2 className="font-semibold">Check-in de hoje</h2>
+        {disciplinas.length === 0 && (
+          <p className="text-sm text-foreground/60">
+            Cadastre suas disciplinas na aba Aulas para começar a fazer check-in.
           </p>
+        )}
+        <div className="flex flex-col gap-2">
+          {disciplinas.map((disciplina) => {
+            const status = presencaHojeMap.get(disciplina.id);
+            return (
+              <div
+                key={disciplina.id}
+                className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
+              >
+                <span className="text-sm font-medium">{disciplina.nome}</span>
+                <div className="flex gap-2">
+                  <form action={marcarPresenca.bind(null, disciplina.id, true)}>
+                    <button
+                      type="submit"
+                      className={`text-xs rounded-full px-3 py-1 border ${
+                        status === true
+                          ? "bg-green-600 text-white border-green-600"
+                          : "border-black/15 dark:border-white/20 text-foreground/70"
+                      }`}
+                    >
+                      Presente
+                    </button>
+                  </form>
+                  <form action={marcarPresenca.bind(null, disciplina.id, false)}>
+                    <button
+                      type="submit"
+                      className={`text-xs rounded-full px-3 py-1 border ${
+                        status === false
+                          ? "bg-red-600 text-white border-red-600"
+                          : "border-black/15 dark:border-white/20 text-foreground/70"
+                      }`}
+                    >
+                      Faltei
+                    </button>
+                  </form>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </section>
+
+      <section className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3">
+        <h2 className="font-semibold">Frequência por disciplina</h2>
+        {disciplinas.length === 0 ? (
+          <p className="text-sm text-foreground/60">Sem disciplinas cadastradas.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-foreground/50">
+                  <th className="py-1 pr-2">Disciplina</th>
+                  <th className="py-1 px-2">Aulas</th>
+                  <th className="py-1 px-2">Presenças</th>
+                  <th className="py-1 px-2">Faltas</th>
+                  <th className="py-1 pl-2">Frequência</th>
+                </tr>
+              </thead>
+              <tbody>
+                {disciplinas.map((d) => {
+                  const presentes = d.presencas.filter((p) => p.presente).length;
+                  const faltas = d.presencas.filter((p) => !p.presente).length;
+                  const total = presentes + faltas;
+                  const pct = total > 0 ? Math.round((presentes / total) * 100) : null;
+                  return (
+                    <tr key={d.id} className="border-t border-black/5 dark:border-white/5">
+                      <td className="py-2 pr-2">{d.nome}</td>
+                      <td className="py-2 px-2">{d.aulas.length}</td>
+                      <td className="py-2 px-2">{presentes}</td>
+                      <td className="py-2 px-2">{faltas}</td>
+                      <td className="py-2 pl-2">{pct === null ? "—" : `${pct}%`}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="font-semibold px-1">Notas por disciplina</h2>
+        {disciplinas.map((d) => (
+          <div
+            key={d.id}
+            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <p className="text-sm font-medium">{d.nome}</p>
+            <div className="flex flex-col gap-1">
+              {d.notas.length === 0 && (
+                <p className="text-xs text-foreground/50">Nenhuma nota lançada.</p>
+              )}
+              {d.notas.map((nota) => (
+                <div key={nota.id} className="flex items-center justify-between text-sm">
+                  <span>{nota.descricao}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{nota.valor}</span>
+                    <form action={deleteNota.bind(null, nota.id)}>
+                      <button
+                        type="submit"
+                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                      >
+                        remover
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form action={addNota.bind(null, d.id)} className="flex gap-2">
+              <input
+                name="descricao"
+                placeholder="Ex: Prova 1"
+                required
+                className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-1.5 text-sm"
+              />
+              <input
+                name="valor"
+                placeholder="Nota"
+                required
+                inputMode="decimal"
+                className="w-24 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-1.5 text-sm"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-foreground text-background px-3 py-1.5 text-sm font-medium"
+              >
+                +
+              </button>
+            </form>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
