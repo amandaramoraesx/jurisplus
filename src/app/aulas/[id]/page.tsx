@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { updateAula, deleteAula } from "../actions";
+import { updateAula, deleteAula, gerarResumoIA } from "../actions";
+import { isIAConfigured } from "@/lib/anthropic";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,37 @@ export default async function AulaDetailPage({
           </button>
         </div>
       </form>
+
+      <div className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-sm text-foreground/70">
+            ✨ Resumo inteligente (IA)
+          </h2>
+          {isIAConfigured() && (
+            <form action={gerarResumoIA.bind(null, aula.id)}>
+              <button
+                type="submit"
+                className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+              >
+                {aula.resumoIA ? "Gerar novamente" : "Gerar resumo"}
+              </button>
+            </form>
+          )}
+        </div>
+        {!isIAConfigured() ? (
+          <p className="text-xs text-foreground/50">
+            Para habilitar, adicione sua chave <code>ANTHROPIC_API_KEY</code> no arquivo{" "}
+            <code>.env</code> do projeto.
+          </p>
+        ) : aula.resumoIA ? (
+          <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
+        ) : (
+          <p className="text-xs text-foreground/50">
+            Preencha o resumo ou as anotações da lousa e clique em &ldquo;Gerar
+            resumo&rdquo; para ter uma síntese pronta para revisão.
+          </p>
+        )}
+      </div>
 
       {aula.favoritosVadeMecum.length > 0 && (
         <div className="rounded-xl border border-black/10 dark:border-white/10 p-4">
