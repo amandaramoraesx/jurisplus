@@ -1,0 +1,157 @@
+import { prisma } from "@/lib/prisma";
+import { favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
+
+export const dynamic = "force-dynamic";
+
+export default async function VadeMecumPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const termo = (q || "").trim();
+
+  const [resultados, favoritos, aulas] = await Promise.all([
+    termo
+      ? prisma.vadeMecumArtigo.findMany({
+          where: {
+            OR: [
+              { codigo: { contains: termo } },
+              { numero: { contains: termo } },
+              { texto: { contains: termo } },
+            ],
+          },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    prisma.vadeMecumFavorito.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { aula: { include: { disciplina: true } } },
+    }),
+    prisma.aula.findMany({
+      orderBy: { data: "desc" },
+      include: { disciplina: true },
+    }),
+  ]);
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-2xl font-bold">Vade Mecum digital</h1>
+        <p className="text-sm text-foreground/60 mt-1">
+          Busque por código (CF, CC, CP, CPC) ou número do artigo.
+        </p>
+      </div>
+
+      <form method="GET" className="flex gap-2">
+        <input
+          name="q"
+          defaultValue={termo}
+          placeholder='Ex: "art. 5", "CC 186", "homicídio"...'
+          className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+        >
+          🔍 Buscar
+        </button>
+      </form>
+
+      {termo && (
+        <div className="flex flex-col gap-3">
+          {resultados.length === 0 && (
+            <p className="text-sm text-foreground/60">
+              Nenhum artigo encontrado para &ldquo;{termo}&rdquo;. A base ainda é pequena — vamos
+              expandindo com o tempo.
+            </p>
+          )}
+          {resultados.map((artigo) => (
+            <div
+              key={artigo.id}
+              className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-2"
+            >
+              <p className="font-semibold text-sm">
+                {artigo.codigo}, art. {artigo.numero}
+              </p>
+              <p className="text-sm text-foreground/80">{artigo.texto}</p>
+              <form action={favoritarArtigo} className="flex flex-wrap items-center gap-2 mt-1">
+                <input type="hidden" name="codigo" value={artigo.codigo} />
+                <input type="hidden" name="numero" value={artigo.numero} />
+                <input type="hidden" name="texto" value={artigo.texto} />
+                <select
+                  name="aulaId"
+                  defaultValue=""
+                  className="text-xs rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2 py-1"
+                >
+                  <option value="">Vincular a uma aula (opcional)</option>
+                  {aulas.map((aula) => (
+                    <option key={aula.id} value={aula.id}>
+                      {aula.disciplina.nome} · {aula.tema}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+                >
+                  ★ Favoritar
+                </button>
+              </form>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-semibold px-1">Favoritos</h2>
+        {favoritos.length === 0 && (
+          <p className="text-sm text-foreground/60">
+            Nenhum artigo favoritado ainda. Busque acima e favorite os que mais usar.
+          </p>
+        )}
+        {favoritos.map((fav) => (
+          <div
+            key={fav.id}
+            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-2"
+          >
+            <div className="flex items-start justify-between">
+              <p className="font-semibold text-sm">
+                {fav.codigo}, art. {fav.numero}
+              </p>
+              <form action={removeFavorito.bind(null, fav.id)}>
+                <button
+                  type="submit"
+                  className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                >
+                  remover
+                </button>
+              </form>
+            </div>
+            <p className="text-sm text-foreground/80">{fav.texto}</p>
+            <form action={vincularFavoritoAula.bind(null, fav.id)} className="flex items-center gap-2">
+              <select
+                name="aulaId"
+                defaultValue={fav.aulaId ?? ""}
+                className="text-xs rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-2 py-1"
+              >
+                <option value="">Sem aula vinculada</option>
+                {aulas.map((aula) => (
+                  <option key={aula.id} value={aula.id}>
+                    {aula.disciplina.nome} · {aula.tema}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+              >
+                Salvar vínculo
+              </button>
+            </form>
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
