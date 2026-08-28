@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createProva, deleteProva } from "./actions";
+import { NotificacoesButton } from "@/components/NotificacoesButton";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,10 @@ export default async function ProvasPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Provas</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h1 className="text-2xl font-bold">Provas</h1>
+        <NotificacoesButton />
+      </div>
 
       <form
         action={createProva}

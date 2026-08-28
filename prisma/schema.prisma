@@ -122,3 +122,23 @@ model VadeMecumFavorito {
   aula      Aula?    @relation(fields: [aulaId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
 }
+
+// Inscrição de push do navegador/PWA para receber lembretes
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+// Registro de lembretes já enviados, para não notificar a mesma prova
+// mais de uma vez para o mesmo limite de dias (ex: 7, 3, 1, 0)
+model LembreteEnviado {
+  id        String   @id @default(cuid())
+  provaId   String
+  dias      Int
+  enviadoEm DateTime @default(now())
+
+  @@unique([provaId, dias])
+}
