@@ -3,7 +3,7 @@
 import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAnthropicClient } from "@/lib/anthropic";
+import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
 import { requireAdmin } from "@/lib/auth";
 
 export async function createDisciplina(formData: FormData) {
@@ -182,4 +182,44 @@ export async function gerarResumoIA(aulaId: string) {
   await db.collection("aulas").doc(aulaId).update({ resumoIA });
 
   revalidatePath(`/aulas/${aulaId}`);
+}
+
+export async function gerarQuizAula(aulaId: string) {
+  const aulaDoc = await db.collection("aulas").doc(aulaId).get();
+  const aula = aulaDoc.data();
+  if (!aula) throw new Error("Aula não encontrada");
+  if (!aula.resumo && !aula.anotacoesLousa) return;
+
+  const conteudo = [aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n\n");
+  const quizIA = await gerarQuizComIA(`a aula "${aula.tema}"`, conteudo, 5);
+
+  await db.collection("aulas").doc(aulaId).update({ quizIA });
+
+  revalidatePath(`/aulas/${aulaId}`);
+}
+
+export async function gerarQuizDisciplina(disciplinaId: string) {
+  const [disciplinaDoc, aulasSnap] = await Promise.all([
+    db.collection("disciplinas").doc(disciplinaId).get(),
+    db.collection("aulas").where("disciplinaId", "==", disciplinaId).get(),
+  ]);
+  const disciplina = disciplinaDoc.data();
+  if (!disciplina) throw new Error("Disciplina não encontrada");
+
+  const conteudos = aulasSnap.docs
+    .map((doc) => doc.data())
+    .filter((aula) => aula.resumo || aula.anotacoesLousa)
+    .map((aula) => `Aula "${aula.tema}":\n${[aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n")}`);
+
+  if (conteudos.length === 0) return;
+
+  const quizIA = await gerarQuizComIA(
+    `a disciplina "${disciplina.nome}" (várias aulas)`,
+    conteudos.join("\n\n---\n\n"),
+    10
+  );
+
+  await db.collection("disciplinas").doc(disciplinaId).update({ quizIA, quizIAGeradoEm: new Date() });
+
+  revalidatePath("/aulas");
 }

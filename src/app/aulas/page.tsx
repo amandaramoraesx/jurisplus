@@ -8,12 +8,20 @@ import {
   type Prova,
   type Nota,
 } from "@/lib/firestore";
-import { createDisciplina, updateDisciplina, deleteDisciplina, createAula } from "./actions";
+import {
+  createDisciplina,
+  updateDisciplina,
+  deleteDisciplina,
+  createAula,
+  gerarQuizDisciplina,
+} from "./actions";
 import { createProfessor, updateProfessor, deleteProfessor } from "@/app/professores/actions";
 import { createProva, updateProva, deleteProva } from "@/app/provas/actions";
 import { addNota, updateNota, deleteNota } from "@/app/notas/actions";
 import { requireUser } from "@/lib/auth";
+import { isIAConfigured } from "@/lib/anthropic";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
+import { QuizPlayer } from "@/components/QuizPlayer";
 
 export const dynamic = "force-dynamic";
 
@@ -234,6 +242,36 @@ export default async function AcademicoPage({
                     </Link>
                   ))}
                 </div>
+
+                <details className="disclosure text-sm">
+                  <summary className="text-foreground/70 font-medium">🧠 Quiz de revisão</summary>
+                  <div className="flex flex-col gap-3 mt-3">
+                    {!isIAConfigured() ? (
+                      <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
+                    ) : (
+                      <>
+                        {disciplina.aulas.some((a) => a.resumo || a.anotacoesLousa) && (
+                          <form action={gerarQuizDisciplina.bind(null, disciplina.id)}>
+                            <button
+                              type="submit"
+                              className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+                            >
+                              {disciplina.quizIA?.length ? "Gerar outro quiz" : "Gerar quiz de revisão"}
+                            </button>
+                          </form>
+                        )}
+                        {disciplina.quizIA?.length ? (
+                          <QuizPlayer perguntas={disciplina.quizIA} />
+                        ) : (
+                          <p className="text-xs text-foreground/50">
+                            Junta as anotações de todas as aulas com conteúdo dessa disciplina e gera
+                            perguntas de revisão para treinar antes da prova.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </details>
               </section>
             ))}
           </div>
@@ -421,6 +459,15 @@ export default async function AcademicoPage({
                       ))}
                     </ul>
                   </details>
+
+                  {isIAConfigured() && aulasComResumo.length > 0 && (
+                    <Link
+                      href={`/aulas?abrir=disciplinas#${prova.disciplinaId}`}
+                      className="text-xs text-foreground/60 hover:underline self-start"
+                    >
+                      🧠 Praticar com quiz de revisão →
+                    </Link>
+                  )}
 
                   <details className="disclosure text-sm">
                     <summary className="text-foreground/70 font-medium">Editar</summary>

@@ -9,12 +9,21 @@ export type Professor = {
   createdAt: Date;
 };
 
+export type QuizPergunta = {
+  pergunta: string;
+  opcoes: string[];
+  respostaCorreta: number;
+  explicacao: string | null;
+};
+
 export type Disciplina = {
   id: string;
   nome: string;
   semestre: string;
   professorId: string | null;
   createdAt: Date;
+  quizIA?: QuizPergunta[] | null;
+  quizIAGeradoEm?: Date | null;
 };
 
 export type Aula = {
@@ -26,6 +35,7 @@ export type Aula = {
   anotacoesLousa: string | null;
   resumoIA: string | null;
   createdAt: Date;
+  quizIA?: QuizPergunta[] | null;
 };
 
 export type Presenca = {
@@ -106,7 +116,7 @@ export type LembreteEnviado = {
   enviadoEm: Date;
 };
 
-const DATE_KEYS = ["data", "createdAt", "enviadoEm"];
+const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm"];
 
 function toPlain(value: unknown): unknown {
   if (value instanceof Timestamp) return value.toDate();

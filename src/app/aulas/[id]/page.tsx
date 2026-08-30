@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
-import { updateAula, deleteAula, gerarResumoIA } from "../actions";
+import { updateAula, deleteAula, gerarResumoIA, gerarQuizAula } from "../actions";
 import { isIAConfigured } from "@/lib/anthropic";
 import { SubmitButton } from "@/components/SubmitButton";
+import { QuizPlayer } from "@/components/QuizPlayer";
 
 export const dynamic = "force-dynamic";
 
@@ -155,8 +156,7 @@ export default async function AulaDetailPage({
           )}
           {!isIAConfigured() ? (
             <p className="text-xs text-foreground/50">
-              Para habilitar, adicione sua chave <code>ANTHROPIC_API_KEY</code> no arquivo{" "}
-              <code>.env</code> do projeto.
+              Recurso de IA ainda não configurado neste app.
             </p>
           ) : aula.resumoIA ? (
             <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
@@ -164,6 +164,34 @@ export default async function AulaDetailPage({
             <p className="text-xs text-foreground/50">
               Preencha as anotações ou a lousa e clique em &ldquo;Gerar
               resumo&rdquo; para ter uma síntese pronta para revisão.
+            </p>
+          )}
+        </div>
+      </details>
+
+      <details className="disclosure card">
+        <summary className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-sm text-foreground/70">🧠 Quiz desta aula</h2>
+          <span className="btn-ghost shrink-0">Abrir</span>
+        </summary>
+        <div className="flex flex-col gap-3 mt-3">
+          {isIAConfigured() && (aula.resumo || aula.anotacoesLousa) && (
+            <form action={gerarQuizAula.bind(null, aula.id)}>
+              <button
+                type="submit"
+                className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+              >
+                {aula.quizIA?.length ? "Gerar outro quiz" : "Gerar quiz"}
+              </button>
+            </form>
+          )}
+          {!isIAConfigured() ? (
+            <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
+          ) : aula.quizIA?.length ? (
+            <QuizPlayer perguntas={aula.quizIA} />
+          ) : (
+            <p className="text-xs text-foreground/50">
+              Preencha as anotações ou a lousa e clique em &ldquo;Gerar quiz&rdquo; para treinar essa aula.
             </p>
           )}
         </div>
