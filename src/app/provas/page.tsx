@@ -49,55 +49,57 @@ export default async function ProvasPage() {
         <NotificacoesButton />
       </div>
 
-      <form
-        action={createProva}
-        className="flex flex-col gap-3 card"
-      >
-        <h2 className="font-semibold text-sm text-foreground/70">Nova prova</h2>
-        {disciplinas.length === 0 ? (
-          <p className="text-sm text-foreground/60">
-            Cadastre uma disciplina na aba Aulas antes de marcar uma prova.
-          </p>
-        ) : (
-          <>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                name="disciplinaId"
-                required
-                className="flex-1 field"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Selecione a disciplina
-                </option>
-                {disciplinas.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.nome}
+      <details className="disclosure card">
+        <summary className="font-semibold text-sm text-foreground/70">Nova prova</summary>
+        <form
+          action={createProva}
+          className="flex flex-col gap-3 mt-3"
+        >
+          {disciplinas.length === 0 ? (
+            <p className="text-sm text-foreground/60">
+              Cadastre uma disciplina na aba Aulas antes de marcar uma prova.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select
+                  name="disciplinaId"
+                  required
+                  className="flex-1 field"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    Selecione a disciplina
                   </option>
-                ))}
-              </select>
-              <input
-                name="data"
-                type="date"
-                required
+                  {disciplinas.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nome}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  name="data"
+                  type="date"
+                  required
+                  className="field"
+                />
+              </div>
+              <textarea
+                name="conteudo"
+                placeholder="Anotações sobre o conteúdo da prova (opcional)"
+                rows={2}
                 className="field"
               />
-            </div>
-            <textarea
-              name="conteudo"
-              placeholder="Anotações sobre o conteúdo da prova (opcional)"
-              rows={2}
-              className="field"
-            />
-            <button
-              type="submit"
-              className="self-start btn-primary"
-            >
-              Marcar prova
-            </button>
-          </>
-        )}
-      </form>
+              <button
+                type="submit"
+                className="self-start btn-primary"
+              >
+                Marcar prova
+              </button>
+            </>
+          )}
+        </form>
+      </details>
 
       <div className="flex flex-col gap-4">
         {provas.length === 0 && (

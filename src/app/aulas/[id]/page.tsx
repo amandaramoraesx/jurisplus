@@ -31,6 +31,8 @@ export default async function AulaDetailPage({
     favoritosVadeMecum: favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc)),
   };
 
+  const temConteudo = Boolean(aula.resumo || aula.anotacoesLousa || aula.resumoIA);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -43,67 +45,104 @@ export default async function AulaDetailPage({
         <h1 className="text-2xl font-bold mt-1">{aula.tema}</h1>
       </div>
 
-      <form
-        action={updateAula.bind(null, aula.id)}
-        className="flex flex-col gap-3 card"
-      >
-        <label className="text-xs font-medium text-foreground/60">
-          Tema
-          <input
-            name="tema"
-            defaultValue={aula.tema}
-            required
-            className="mt-1 w-full field"
-          />
-        </label>
-        <label className="text-xs font-medium text-foreground/60">
-          Data
-          <input
-            name="data"
-            type="date"
-            defaultValue={aula.data.toISOString().slice(0, 10)}
-            className="mt-1 w-full field"
-          />
-        </label>
-        <label className="text-xs font-medium text-foreground/60">
-          Anotações
-          <textarea
-            name="resumo"
-            defaultValue={aula.resumo ?? ""}
-            rows={6}
-            placeholder="Escreva aqui suas anotações sobre a aula..."
-            className="mt-1 w-full field"
-          />
-        </label>
-        <label className="text-xs font-medium text-foreground/60">
-          Lousa
-          <textarea
-            name="anotacoesLousa"
-            defaultValue={aula.anotacoesLousa ?? ""}
-            rows={6}
-            placeholder="Copie aqui o que o professor escreveu na lousa..."
-            className="mt-1 w-full field font-mono"
-          />
-        </label>
-        <div className="flex gap-3">
-          <SubmitButton>Salvar</SubmitButton>
-        </div>
-      </form>
+      <section className="card">
+        {!temConteudo ? (
+          <p className="text-sm text-foreground/60">
+            Ainda não tem anotação nem lousa registrada nessa aula.
+          </p>
+        ) : (
+          <details className="disclosure">
+            <summary className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">Ver anotações</h2>
+              <span className="btn-ghost shrink-0">Abrir</span>
+            </summary>
+            <div className="flex flex-col gap-4 mt-4">
+              {aula.resumo && (
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">Anotações</h3>
+                  <p className="text-sm whitespace-pre-wrap">{aula.resumo}</p>
+                </div>
+              )}
+              {aula.anotacoesLousa && (
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">Lousa</h3>
+                  <p className="text-sm whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
+                </div>
+              )}
+              {aula.resumoIA && (
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
+                    ✨ Resumo inteligente (IA)
+                  </h3>
+                  <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
+                </div>
+              )}
+              <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary self-start">
+                🖨️ Ver resumo e gerar PDF
+              </Link>
+            </div>
+          </details>
+        )}
+      </section>
 
-      {(aula.resumo || aula.anotacoesLousa || aula.resumoIA) && (
-        <Link
-          href={`/aulas/${aula.id}/imprimir`}
-          className="btn-ghost self-start"
+      <details className="disclosure card">
+        <summary className="text-foreground/70 font-medium">✏️ Editar anotações</summary>
+        <form
+          action={updateAula.bind(null, aula.id)}
+          className="flex flex-col gap-3 mt-3"
         >
-          🖨️ Ver resumo e gerar PDF
-        </Link>
-      )}
+          <label className="text-xs font-medium text-foreground/60">
+            Tema
+            <input
+              name="tema"
+              defaultValue={aula.tema}
+              required
+              className="mt-1 w-full field"
+            />
+          </label>
+          <label className="text-xs font-medium text-foreground/60">
+            Data
+            <input
+              name="data"
+              type="date"
+              defaultValue={aula.data.toISOString().slice(0, 10)}
+              className="mt-1 w-full field"
+            />
+          </label>
+          <label className="text-xs font-medium text-foreground/60">
+            Anotações
+            <textarea
+              name="resumo"
+              defaultValue={aula.resumo ?? ""}
+              rows={6}
+              placeholder="Escreva aqui suas anotações sobre a aula..."
+              className="mt-1 w-full field"
+            />
+          </label>
+          <label className="text-xs font-medium text-foreground/60">
+            Lousa
+            <textarea
+              name="anotacoesLousa"
+              defaultValue={aula.anotacoesLousa ?? ""}
+              rows={6}
+              placeholder="Copie aqui o que o professor escreveu na lousa..."
+              className="mt-1 w-full field font-mono"
+            />
+          </label>
+          <div className="flex gap-3">
+            <SubmitButton>Salvar</SubmitButton>
+          </div>
+        </form>
+      </details>
 
-      <div className="card flex flex-col gap-3">
-        <div className="flex items-center justify-between">
+      <details className="disclosure card">
+        <summary className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-sm text-foreground/70">
             ✨ Resumo inteligente (IA)
           </h2>
+          <span className="btn-ghost shrink-0">Abrir</span>
+        </summary>
+        <div className="flex flex-col gap-3 mt-3">
           {isIAConfigured() && (
             <form action={gerarResumoIA.bind(null, aula.id)}>
               <button
@@ -114,21 +153,21 @@ export default async function AulaDetailPage({
               </button>
             </form>
           )}
+          {!isIAConfigured() ? (
+            <p className="text-xs text-foreground/50">
+              Para habilitar, adicione sua chave <code>ANTHROPIC_API_KEY</code> no arquivo{" "}
+              <code>.env</code> do projeto.
+            </p>
+          ) : aula.resumoIA ? (
+            <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
+          ) : (
+            <p className="text-xs text-foreground/50">
+              Preencha as anotações ou a lousa e clique em &ldquo;Gerar
+              resumo&rdquo; para ter uma síntese pronta para revisão.
+            </p>
+          )}
         </div>
-        {!isIAConfigured() ? (
-          <p className="text-xs text-foreground/50">
-            Para habilitar, adicione sua chave <code>ANTHROPIC_API_KEY</code> no arquivo{" "}
-            <code>.env</code> do projeto.
-          </p>
-        ) : aula.resumoIA ? (
-          <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
-        ) : (
-          <p className="text-xs text-foreground/50">
-            Preencha as anotações ou a lousa e clique em &ldquo;Gerar
-            resumo&rdquo; para ter uma síntese pronta para revisão.
-          </p>
-        )}
-      </div>
+      </details>
 
       {aula.favoritosVadeMecum.length > 0 && (
         <div className="card">

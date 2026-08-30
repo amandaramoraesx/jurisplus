@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor } from "@/lib/firestore";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
@@ -197,9 +198,19 @@ export default async function DashboardPage() {
                       className="field font-mono"
                     />
                   </label>
-                  <SubmitButton savedLabel="Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
-                    Salvar anotação
-                  </SubmitButton>
+                  <div className="flex items-center gap-3">
+                    <SubmitButton savedLabel="Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
+                      Salvar anotação
+                    </SubmitButton>
+                    {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
+                      <Link
+                        href={`/aulas/${disciplina.id}_${hojeKey}`}
+                        className="text-xs text-foreground/60 hover:underline"
+                      >
+                        Ver aula e gerar PDF →
+                      </Link>
+                    )}
+                  </div>
                 </form>
               </details>
             ))}

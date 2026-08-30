@@ -35,56 +35,58 @@ export default async function GruposPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold">Trabalhos em grupo</h1>
 
-      <form
-        action={createGrupo}
-        className="flex flex-col gap-3 card"
-      >
-        <h2 className="font-semibold text-sm text-foreground/70">Novo trabalho</h2>
-        <div className="flex flex-col sm:flex-row gap-3">
+      <details className="disclosure card">
+        <summary className="font-semibold text-sm text-foreground/70">Novo trabalho</summary>
+        <form
+          action={createGrupo}
+          className="flex flex-col gap-3 mt-3"
+        >
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              name="tema"
+              placeholder="Tema do trabalho"
+              required
+              className="flex-1 field"
+            />
+            <input
+              name="data"
+              type="date"
+              required
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className="field"
+            />
+          </div>
+          <select
+            name="disciplinaId"
+            defaultValue=""
+            className="field"
+          >
+            <option value="">Sem disciplina vinculada</option>
+            {disciplinas.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nome}
+              </option>
+            ))}
+          </select>
           <input
-            name="tema"
-            placeholder="Tema do trabalho"
-            required
-            className="flex-1 field"
-          />
-          <input
-            name="data"
-            type="date"
-            required
-            defaultValue={new Date().toISOString().slice(0, 10)}
+            name="integrantes"
+            placeholder="Integrantes, separados por vírgula"
             className="field"
           />
-        </div>
-        <select
-          name="disciplinaId"
-          defaultValue=""
-          className="field"
-        >
-          <option value="">Sem disciplina vinculada</option>
-          {disciplinas.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.nome}
-            </option>
-          ))}
-        </select>
-        <input
-          name="integrantes"
-          placeholder="Integrantes, separados por vírgula"
-          className="field"
-        />
-        <textarea
-          name="apresentacao"
-          placeholder="O que vamos apresentar"
-          rows={2}
-          className="field"
-        />
-        <button
-          type="submit"
-          className="self-start btn-primary"
-        >
-          Criar grupo
-        </button>
-      </form>
+          <textarea
+            name="apresentacao"
+            placeholder="O que vamos apresentar"
+            rows={2}
+            className="field"
+          />
+          <button
+            type="submit"
+            className="self-start btn-primary"
+          >
+            Criar grupo
+          </button>
+        </form>
+      </details>
 
       <div className="flex flex-col gap-4">
         {grupos.length === 0 && (

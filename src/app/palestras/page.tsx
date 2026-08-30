@@ -22,37 +22,39 @@ export default async function PalestrasPage() {
         </p>
       </div>
 
-      <form action={createPalestra} className="flex flex-col gap-3 card">
-        <h2 className="section-title">Nova atividade</h2>
-        <input name="tema" placeholder="Tema da palestra" required className="field" />
-        <input name="palestrante" placeholder="Palestrante (opcional)" className="field" />
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            name="data"
-            type="date"
-            required
-            defaultValue={new Date().toISOString().slice(0, 10)}
+      <details className="disclosure card">
+        <summary className="section-title">Nova atividade</summary>
+        <form action={createPalestra} className="flex flex-col gap-3 mt-3">
+          <input name="tema" placeholder="Tema da palestra" required className="field" />
+          <input name="palestrante" placeholder="Palestrante (opcional)" className="field" />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              name="data"
+              type="date"
+              required
+              defaultValue={new Date().toISOString().slice(0, 10)}
+              className="field"
+            />
+            <input
+              name="horas"
+              placeholder="Horas (ex: 2)"
+              inputMode="decimal"
+              required
+              className="w-32 field"
+            />
+            <input name="local" placeholder="Local (opcional)" className="flex-1 field" />
+          </div>
+          <textarea
+            name="resumo"
+            placeholder="Resumo do que foi apresentado"
+            rows={2}
             className="field"
           />
-          <input
-            name="horas"
-            placeholder="Horas (ex: 2)"
-            inputMode="decimal"
-            required
-            className="w-32 field"
-          />
-          <input name="local" placeholder="Local (opcional)" className="flex-1 field" />
-        </div>
-        <textarea
-          name="resumo"
-          placeholder="Resumo do que foi apresentado"
-          rows={2}
-          className="field"
-        />
-        <button type="submit" className="self-start btn-primary">
-          Adicionar
-        </button>
-      </form>
+          <button type="submit" className="self-start btn-primary">
+            Adicionar
+          </button>
+        </form>
+      </details>
 
       <div className="flex flex-col gap-3">
         {palestras.length === 0 && (

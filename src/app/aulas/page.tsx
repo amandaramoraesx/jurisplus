@@ -45,44 +45,46 @@ export default async function AulasPage() {
       <h1 className="text-2xl font-bold">Aulas</h1>
 
       {isAdmin && (
-        <form
-          action={createDisciplina}
-          className="flex flex-col gap-3 card"
-        >
-          <h2 className="font-semibold text-sm text-foreground/70">Nova disciplina</h2>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              name="nome"
-              placeholder="Nome da disciplina"
-              required
-              className="flex-1 field"
-            />
-            <input
-              name="semestre"
-              placeholder="Semestre (ex: 2026.2)"
-              required
-              className="w-40 field"
-            />
-          </div>
-          <select
-            name="professorId"
-            className="field"
-            defaultValue=""
+        <details className="disclosure card">
+          <summary className="font-semibold text-sm text-foreground/70">Nova disciplina</summary>
+          <form
+            action={createDisciplina}
+            className="flex flex-col gap-3 mt-3"
           >
-            <option value="">Sem professor vinculado</option>
-            {professores.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nome}
-              </option>
-            ))}
-          </select>
-          <button
-            type="submit"
-            className="self-start btn-primary"
-          >
-            Criar disciplina
-          </button>
-        </form>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                name="nome"
+                placeholder="Nome da disciplina"
+                required
+                className="flex-1 field"
+              />
+              <input
+                name="semestre"
+                placeholder="Semestre (ex: 2026.2)"
+                required
+                className="w-40 field"
+              />
+            </div>
+            <select
+              name="professorId"
+              className="field"
+              defaultValue=""
+            >
+              <option value="">Sem professor vinculado</option>
+              {professores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="self-start btn-primary"
+            >
+              Criar disciplina
+            </button>
+          </form>
+        </details>
       )}
 
       <div className="flex flex-col gap-8">

@@ -36,37 +36,39 @@ export default async function ProfessoresPage() {
       <h1 className="text-2xl font-bold">Professores</h1>
 
       {isAdmin && (
-        <form
-          action={createProfessor}
-          className="flex flex-col gap-3 card"
-        >
-          <h2 className="font-semibold text-sm text-foreground/70">Novo professor</h2>
-          <input
-            name="nome"
-            placeholder="Nome"
-            required
-            className="field"
-          />
-          <div className="flex gap-3">
-            <input
-              name="email"
-              type="email"
-              placeholder="E-mail (opcional)"
-              className="flex-1 field"
-            />
-            <input
-              name="telefone"
-              placeholder="Telefone (opcional)"
-              className="flex-1 field"
-            />
-          </div>
-          <button
-            type="submit"
-            className="self-start btn-primary"
+        <details className="disclosure card">
+          <summary className="font-semibold text-sm text-foreground/70">Novo professor</summary>
+          <form
+            action={createProfessor}
+            className="flex flex-col gap-3 mt-3"
           >
-            Adicionar
-          </button>
-        </form>
+            <input
+              name="nome"
+              placeholder="Nome"
+              required
+              className="field"
+            />
+            <div className="flex gap-3">
+              <input
+                name="email"
+                type="email"
+                placeholder="E-mail (opcional)"
+                className="flex-1 field"
+              />
+              <input
+                name="telefone"
+                placeholder="Telefone (opcional)"
+                className="flex-1 field"
+              />
+            </div>
+            <button
+              type="submit"
+              className="self-start btn-primary"
+            >
+              Adicionar
+            </button>
+          </form>
+        </details>
       )}
 
       <div className="flex flex-col gap-2">
