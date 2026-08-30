@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Palestra } from "@/lib/firestore";
-import { createPalestra, deletePalestra } from "./actions";
+import { createPalestra, updatePalestra, deletePalestra } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,48 +22,34 @@ export default async function PalestrasPage() {
         </p>
       </div>
 
-      <form
-        action={createPalestra}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 p-4"
-      >
-        <h2 className="font-semibold text-sm text-foreground/70">Nova atividade</h2>
-        <input
-          name="tema"
-          placeholder="Tema da palestra"
-          required
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-        />
+      <form action={createPalestra} className="flex flex-col gap-3 card">
+        <h2 className="section-title">Nova atividade</h2>
+        <input name="tema" placeholder="Tema da palestra" required className="field" />
+        <input name="palestrante" placeholder="Palestrante (opcional)" className="field" />
         <div className="flex flex-col sm:flex-row gap-3">
           <input
             name="data"
             type="date"
             required
             defaultValue={new Date().toISOString().slice(0, 10)}
-            className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="field"
           />
           <input
             name="horas"
             placeholder="Horas (ex: 2)"
             inputMode="decimal"
             required
-            className="w-32 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="w-32 field"
           />
-          <input
-            name="local"
-            placeholder="Local (opcional)"
-            className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
-          />
+          <input name="local" placeholder="Local (opcional)" className="flex-1 field" />
         </div>
         <textarea
           name="resumo"
           placeholder="Resumo do que foi apresentado"
           rows={2}
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="field"
         />
-        <button
-          type="submit"
-          className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
-        >
+        <button type="submit" className="self-start btn-primary">
           Adicionar
         </button>
       </form>
@@ -73,23 +59,71 @@ export default async function PalestrasPage() {
           <p className="text-sm text-foreground/60">Nenhuma palestra registrada ainda.</p>
         )}
         {palestras.map((p) => (
-          <div
-            key={p.id}
-            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-1"
-          >
-            <div className="flex items-start justify-between">
-              <p className="font-semibold">{p.tema}</p>
-              <span className="text-xs text-foreground/60">
+          <div key={p.id} className="card flex flex-col gap-1">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold">{p.tema}</p>
+                {p.palestrante && (
+                  <p className="text-xs text-foreground/70">Por {p.palestrante}</p>
+                )}
+              </div>
+              <span className="text-xs text-foreground/60 shrink-0">
                 {formatDate(p.data)} · {p.horas}h
               </span>
             </div>
             {p.local && <p className="text-xs text-foreground/60">{p.local}</p>}
             {p.resumo && <p className="text-sm mt-1">{p.resumo}</p>}
-            <form action={deletePalestra.bind(null, p.id)} className="self-start mt-1">
-              <button
-                type="submit"
-                className="text-xs text-red-600 dark:text-red-400 hover:underline"
+
+            <details className="disclosure text-sm mt-1">
+              <summary className="text-foreground/70 font-medium">Editar</summary>
+              <form
+                action={updatePalestra.bind(null, p.id)}
+                className="flex flex-col gap-2 mt-3"
               >
+                <input name="tema" defaultValue={p.tema} required className="field" />
+                <input
+                  name="palestrante"
+                  defaultValue={p.palestrante ?? ""}
+                  placeholder="Palestrante (opcional)"
+                  className="field"
+                />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    name="data"
+                    type="date"
+                    required
+                    defaultValue={p.data.toISOString().slice(0, 10)}
+                    className="field"
+                  />
+                  <input
+                    name="horas"
+                    defaultValue={p.horas}
+                    inputMode="decimal"
+                    required
+                    className="w-32 field"
+                  />
+                  <input
+                    name="local"
+                    defaultValue={p.local ?? ""}
+                    placeholder="Local (opcional)"
+                    className="flex-1 field"
+                  />
+                </div>
+                <textarea
+                  name="resumo"
+                  defaultValue={p.resumo ?? ""}
+                  placeholder="Resumo do que foi apresentado"
+                  rows={2}
+                  className="field"
+                />
+                <button type="submit" className="self-start btn-primary">
+                  Salvar alterações
+                </button>
+              </form>
+            </details>
+
+            <form action={deletePalestra.bind(null, p.id)} className="self-start">
+              <button type="submit" className="btn-danger-text">
                 Remover
               </button>
             </form>

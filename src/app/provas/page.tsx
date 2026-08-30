@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type Prova } from "@/lib/firestore";
-import { createProva, deleteProva } from "./actions";
+import { createProva, updateProva, deleteProva } from "./actions";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export default async function ProvasPage() {
 
       <form
         action={createProva}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 p-4"
+        className="flex flex-col gap-3 card"
       >
         <h2 className="font-semibold text-sm text-foreground/70">Nova prova</h2>
         {disciplinas.length === 0 ? (
@@ -64,7 +64,7 @@ export default async function ProvasPage() {
               <select
                 name="disciplinaId"
                 required
-                className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                className="flex-1 field"
                 defaultValue=""
               >
                 <option value="" disabled>
@@ -80,18 +80,18 @@ export default async function ProvasPage() {
                 name="data"
                 type="date"
                 required
-                className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                className="field"
               />
             </div>
             <textarea
               name="conteudo"
               placeholder="Anotações sobre o conteúdo da prova (opcional)"
               rows={2}
-              className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+              className="field"
             />
             <button
               type="submit"
-              className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+              className="self-start btn-primary"
             >
               Marcar prova
             </button>
@@ -111,7 +111,7 @@ export default async function ProvasPage() {
           return (
             <div
               key={prova.id}
-              className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3"
+              className="card flex flex-col gap-3"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -139,8 +139,8 @@ export default async function ProvasPage() {
 
               {prova.conteudo && <p className="text-sm">{prova.conteudo}</p>}
 
-              <details className="text-sm">
-                <summary className="cursor-pointer text-foreground/70 font-medium">
+              <details className="disclosure text-sm">
+                <summary className="text-foreground/70 font-medium">
                   Conteúdo sugerido para estudar ({aulasComResumo.length} aula
                   {aulasComResumo.length === 1 ? "" : "s"} com anotações)
                 </summary>
@@ -166,10 +166,55 @@ export default async function ProvasPage() {
                 </ul>
               </details>
 
+              <details className="disclosure text-sm">
+                <summary className="text-foreground/70 font-medium">
+                  Editar
+                </summary>
+                <form
+                  action={updateProva.bind(null, prova.id)}
+                  className="flex flex-col gap-2 mt-3"
+                >
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select
+                      name="disciplinaId"
+                      required
+                      defaultValue={prova.disciplinaId}
+                      className="flex-1 field"
+                    >
+                      {disciplinas.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      name="data"
+                      type="date"
+                      required
+                      defaultValue={prova.data.toISOString().slice(0, 10)}
+                      className="field"
+                    />
+                  </div>
+                  <textarea
+                    name="conteudo"
+                    placeholder="Anotações sobre o conteúdo da prova (opcional)"
+                    rows={2}
+                    defaultValue={prova.conteudo ?? ""}
+                    className="field"
+                  />
+                  <button
+                    type="submit"
+                    className="self-start btn-primary"
+                  >
+                    Salvar alterações
+                  </button>
+                </form>
+              </details>
+
               <form action={deleteProva.bind(null, prova.id)}>
                 <button
                   type="submit"
-                  className="text-xs text-red-600 dark:text-red-400 hover:underline self-start"
+                  className="btn-danger-text self-start"
                 >
                   Remover
                 </button>

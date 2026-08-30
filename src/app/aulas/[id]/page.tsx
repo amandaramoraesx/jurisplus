@@ -44,7 +44,7 @@ export default async function AulaDetailPage({
 
       <form
         action={updateAula.bind(null, aula.id)}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 p-4"
+        className="flex flex-col gap-3 card"
       >
         <label className="text-xs font-medium text-foreground/60">
           Tema
@@ -52,7 +52,7 @@ export default async function AulaDetailPage({
             name="tema"
             defaultValue={aula.tema}
             required
-            className="mt-1 w-full rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="mt-1 w-full field"
           />
         </label>
         <label className="text-xs font-medium text-foreground/60">
@@ -61,7 +61,7 @@ export default async function AulaDetailPage({
             name="data"
             type="date"
             defaultValue={aula.data.toISOString().slice(0, 10)}
-            className="mt-1 w-full rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="mt-1 w-full field"
           />
         </label>
         <label className="text-xs font-medium text-foreground/60">
@@ -71,7 +71,7 @@ export default async function AulaDetailPage({
             defaultValue={aula.resumo ?? ""}
             rows={6}
             placeholder="Escreva aqui o resumo do que foi explicado na aula..."
-            className="mt-1 w-full rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="mt-1 w-full field"
           />
         </label>
         <label className="text-xs font-medium text-foreground/60">
@@ -81,20 +81,20 @@ export default async function AulaDetailPage({
             defaultValue={aula.anotacoesLousa ?? ""}
             rows={6}
             placeholder="Copie aqui o que o professor escreveu na lousa..."
-            className="mt-1 w-full rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm font-mono"
+            className="mt-1 w-full field font-mono"
           />
         </label>
         <div className="flex gap-3">
           <button
             type="submit"
-            className="rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+            className="btn-primary"
           >
             Salvar
           </button>
         </div>
       </form>
 
-      <div className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3">
+      <div className="card flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-sm text-foreground/70">
             ✨ Resumo inteligente (IA)
@@ -126,7 +126,7 @@ export default async function AulaDetailPage({
       </div>
 
       {aula.favoritosVadeMecum.length > 0 && (
-        <div className="rounded-xl border border-black/10 dark:border-white/10 p-4">
+        <div className="card">
           <h2 className="font-semibold text-sm text-foreground/70 mb-2">
             Artigos vinculados a esta aula
           </h2>
@@ -146,7 +146,7 @@ export default async function AulaDetailPage({
       <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
         <button
           type="submit"
-          className="text-xs text-red-600 dark:text-red-400 hover:underline"
+          className="btn-danger-text"
         >
           Remover esta aula
         </button>

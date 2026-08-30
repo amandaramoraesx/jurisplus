@@ -55,6 +55,7 @@ export type Prova = {
 export type Palestra = {
   id: string;
   tema: string;
+  palestrante: string | null;
   resumo: string | null;
   data: Date;
   horas: number;

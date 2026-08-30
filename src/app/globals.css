@@ -1,28 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf9f7;
+  --foreground: #1c1a17;
+  --surface: #ffffff;
+  --surface-border: rgba(28, 26, 23, 0.08);
+  --accent: #5b3a8e;
+  --accent-hover: #4c2f79;
+  --accent-foreground: #ffffff;
+  --accent-soft: rgba(91, 58, 142, 0.1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #15130f;
+    --foreground: #f1efe9;
+    --surface: #201d18;
+    --surface-border: rgba(255, 255, 255, 0.08);
+    --accent: #a78bda;
+    --accent-hover: #b79fe3;
+    --accent-foreground: #1c1330;
+    --accent-soft: rgba(167, 139, 218, 0.14);
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 .no-scrollbar {
@@ -31,5 +46,108 @@ body {
 }
 
 .no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Componentes reutilizados nas telas do Juris+ */
+
+.card {
+  border-radius: 1rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  padding: 1.1rem;
+  box-shadow: 0 1px 2px rgba(28, 26, 23, 0.03);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.card-interactive:hover {
+  box-shadow: 0 4px 14px rgba(28, 26, 23, 0.07);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--surface-border));
+}
+
+.field {
+  border-radius: 0.65rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  padding: 0.55rem 0.8rem;
+  font-size: 0.875rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.btn-primary {
+  border-radius: 0.65rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  padding: 0.55rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-ghost {
+  border-radius: 0.65rem;
+  border: 1px solid var(--surface-border);
+  padding: 0.4rem 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-ghost:hover {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--surface-border));
+}
+
+.btn-danger-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #b3391f;
+  transition: opacity 0.15s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-danger-text {
+    color: #f0876f;
+  }
+}
+
+.btn-danger-text:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--foreground) 55%, transparent);
+}
+
+.disclosure summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure summary::-webkit-details-marker {
   display: none;
 }

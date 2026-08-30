@@ -37,7 +37,7 @@ export default async function GruposPage() {
 
       <form
         action={createGrupo}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 p-4"
+        className="flex flex-col gap-3 card"
       >
         <h2 className="font-semibold text-sm text-foreground/70">Novo trabalho</h2>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -45,20 +45,20 @@ export default async function GruposPage() {
             name="tema"
             placeholder="Tema do trabalho"
             required
-            className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="flex-1 field"
           />
           <input
             name="data"
             type="date"
             required
             defaultValue={new Date().toISOString().slice(0, 10)}
-            className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="field"
           />
         </div>
         <select
           name="disciplinaId"
           defaultValue=""
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="field"
         >
           <option value="">Sem disciplina vinculada</option>
           {disciplinas.map((d) => (
@@ -70,17 +70,17 @@ export default async function GruposPage() {
         <input
           name="integrantes"
           placeholder="Integrantes, separados por vírgula"
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="field"
         />
         <textarea
           name="apresentacao"
           placeholder="O que vamos apresentar"
           rows={2}
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="field"
         />
         <button
           type="submit"
-          className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+          className="self-start btn-primary"
         >
           Criar grupo
         </button>
@@ -93,7 +93,7 @@ export default async function GruposPage() {
         {grupos.map((grupo) => (
           <div
             key={grupo.id}
-            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-3"
+            className="card flex flex-col gap-3"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -106,7 +106,7 @@ export default async function GruposPage() {
               <form action={deleteGrupo.bind(null, grupo.id)}>
                 <button
                   type="submit"
-                  className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                  className="btn-danger-text"
                 >
                   Remover
                 </button>
@@ -148,8 +148,8 @@ export default async function GruposPage() {
 
             {grupo.apresentacao && <p className="text-sm">{grupo.apresentacao}</p>}
 
-            <details className="text-sm">
-              <summary className="cursor-pointer text-foreground/70 font-medium">
+            <details className="disclosure text-sm">
+              <summary className="text-foreground/70 font-medium">
                 Editar trabalho
               </summary>
               <form
@@ -160,19 +160,19 @@ export default async function GruposPage() {
                   <input
                     name="tema"
                     defaultValue={grupo.tema}
-                    className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                    className="flex-1 field"
                   />
                   <input
                     name="data"
                     type="date"
                     defaultValue={grupo.data.toISOString().slice(0, 10)}
-                    className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                    className="field"
                   />
                 </div>
                 <select
                   name="disciplinaId"
                   defaultValue={grupo.disciplinaId ?? ""}
-                  className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                  className="field"
                 >
                   <option value="">Sem disciplina vinculada</option>
                   {disciplinas.map((d) => (
@@ -185,11 +185,11 @@ export default async function GruposPage() {
                   name="apresentacao"
                   defaultValue={grupo.apresentacao ?? ""}
                   rows={2}
-                  className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                  className="field"
                 />
                 <button
                   type="submit"
-                  className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+                  className="self-start btn-primary"
                 >
                   Salvar alterações
                 </button>

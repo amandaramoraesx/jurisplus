@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#171717",
+  themeColor: "#5b3a8e",
   width: "device-width",
   initialScale: 1,
 };
@@ -49,7 +49,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ServiceWorkerRegister />
         <NavBar />
         <div className="flex-1 min-w-0">
-          <header className="md:hidden flex items-center justify-center h-14 border-b border-black/10 dark:border-white/10">
+          <header className="md:hidden flex items-center justify-center gap-2 h-14 border-b border-black/10 dark:border-white/10">
+            <span className="text-lg">⚖️</span>
             <span className="text-lg font-bold tracking-tight">Juris+</span>
           </header>
           <main className="px-4 py-6 pb-24 md:pb-6 max-w-3xl mx-auto w-full">

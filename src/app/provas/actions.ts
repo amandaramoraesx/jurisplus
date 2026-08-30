@@ -20,6 +20,25 @@ export async function createProva(formData: FormData) {
   revalidatePath("/provas");
 }
 
+export async function updateProva(id: string, formData: FormData) {
+  const disciplinaId = String(formData.get("disciplinaId") || "").trim();
+  const dataStr = String(formData.get("data") || "");
+  const conteudo = String(formData.get("conteudo") || "").trim();
+
+  if (!disciplinaId || !dataStr) return;
+
+  await db
+    .collection("provas")
+    .doc(id)
+    .update({
+      disciplinaId,
+      data: new Date(dataStr),
+      conteudo: conteudo || null,
+    });
+
+  revalidatePath("/provas");
+}
+
 export async function deleteProva(id: string) {
   await db.collection("provas").doc(id).delete();
   revalidatePath("/provas");

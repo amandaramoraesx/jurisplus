@@ -59,11 +59,11 @@ export default async function VadeMecumPage({
           name="q"
           defaultValue={termo}
           placeholder='Ex: "art. 5", "CC 186", "homicídio"...'
-          className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="flex-1 field"
         />
         <button
           type="submit"
-          className="rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+          className="btn-primary"
         >
           🔍 Buscar
         </button>
@@ -80,7 +80,7 @@ export default async function VadeMecumPage({
           {resultados.map((artigo) => (
             <div
               key={artigo.id}
-              className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-2"
+              className="card flex flex-col gap-2"
             >
               <p className="font-semibold text-sm">
                 {artigo.codigo}, art. {artigo.numero}
@@ -124,7 +124,7 @@ export default async function VadeMecumPage({
         {favoritos.map((fav) => (
           <div
             key={fav.id}
-            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-2"
+            className="card flex flex-col gap-2"
           >
             <div className="flex items-start justify-between">
               <p className="font-semibold text-sm">
@@ -133,7 +133,7 @@ export default async function VadeMecumPage({
               <form action={removeFavorito.bind(null, fav.id)}>
                 <button
                   type="submit"
-                  className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                  className="btn-danger-text"
                 >
                   remover
                 </button>

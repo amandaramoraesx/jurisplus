@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Disciplina, type Professor, type Aula } from "@/lib/firestore";
-import { createDisciplina, deleteDisciplina, createAula } from "./actions";
+import { createDisciplina, updateDisciplina, deleteDisciplina, createAula } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +42,7 @@ export default async function AulasPage() {
 
       <form
         action={createDisciplina}
-        className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 p-4"
+        className="flex flex-col gap-3 card"
       >
         <h2 className="font-semibold text-sm text-foreground/70">Nova disciplina</h2>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -50,18 +50,18 @@ export default async function AulasPage() {
             name="nome"
             placeholder="Nome da disciplina"
             required
-            className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="flex-1 field"
           />
           <input
             name="semestre"
             placeholder="Semestre (ex: 2026.2)"
             required
-            className="w-40 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+            className="w-40 field"
           />
         </div>
         <select
           name="professorId"
-          className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+          className="field"
           defaultValue=""
         >
           <option value="">Sem professor vinculado</option>
@@ -73,7 +73,7 @@ export default async function AulasPage() {
         </select>
         <button
           type="submit"
-          className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+          className="self-start btn-primary"
         >
           Criar disciplina
         </button>
@@ -90,7 +90,7 @@ export default async function AulasPage() {
           <section
             key={disciplina.id}
             id={disciplina.id}
-            className="rounded-xl border border-black/10 dark:border-white/10 p-4 flex flex-col gap-4"
+            className="card flex flex-col gap-4"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -103,15 +103,58 @@ export default async function AulasPage() {
               <form action={deleteDisciplina.bind(null, disciplina.id)}>
                 <button
                   type="submit"
-                  className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                  className="btn-danger-text"
                 >
                   Remover
                 </button>
               </form>
             </div>
 
-            <details className="text-sm">
-              <summary className="cursor-pointer text-foreground/70 font-medium">
+            <details className="disclosure text-sm">
+              <summary className="text-foreground/70 font-medium">
+                Editar disciplina
+              </summary>
+              <form
+                action={updateDisciplina.bind(null, disciplina.id)}
+                className="flex flex-col gap-2 mt-3"
+              >
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    name="nome"
+                    defaultValue={disciplina.nome}
+                    required
+                    className="flex-1 field"
+                  />
+                  <input
+                    name="semestre"
+                    defaultValue={disciplina.semestre}
+                    required
+                    className="w-40 field"
+                  />
+                </div>
+                <select
+                  name="professorId"
+                  defaultValue={disciplina.professorId ?? ""}
+                  className="field"
+                >
+                  <option value="">Sem professor vinculado</option>
+                  {professores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  className="self-start btn-primary"
+                >
+                  Salvar alterações
+                </button>
+              </form>
+            </details>
+
+            <details className="disclosure text-sm">
+              <summary className="text-foreground/70 font-medium">
                 + Nova aula
               </summary>
               <form
@@ -123,31 +166,31 @@ export default async function AulasPage() {
                     name="tema"
                     placeholder="Tema da aula"
                     required
-                    className="flex-1 rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                    className="flex-1 field"
                   />
                   <input
                     name="data"
                     type="date"
                     required
                     defaultValue={new Date().toISOString().slice(0, 10)}
-                    className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                    className="field"
                   />
                 </div>
                 <textarea
                   name="resumo"
                   placeholder="Resumo da aula"
                   rows={2}
-                  className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                  className="field"
                 />
                 <textarea
                   name="anotacoesLousa"
                   placeholder="Anotações da lousa"
                   rows={2}
-                  className="rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm"
+                  className="field"
                 />
                 <button
                   type="submit"
-                  className="self-start rounded-lg bg-foreground text-background px-4 py-2 text-sm font-medium"
+                  className="self-start btn-primary"
                 >
                   Salvar aula
                 </button>

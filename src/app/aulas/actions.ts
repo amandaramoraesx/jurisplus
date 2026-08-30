@@ -22,6 +22,25 @@ export async function createDisciplina(formData: FormData) {
   revalidatePath("/aulas");
 }
 
+export async function updateDisciplina(id: string, formData: FormData) {
+  const nome = String(formData.get("nome") || "").trim();
+  const semestre = String(formData.get("semestre") || "").trim();
+  const professorId = String(formData.get("professorId") || "").trim();
+
+  if (!nome || !semestre) return;
+
+  await db
+    .collection("disciplinas")
+    .doc(id)
+    .update({
+      nome,
+      semestre,
+      professorId: professorId || null,
+    });
+
+  revalidatePath("/aulas");
+}
+
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
