@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Disciplina, type Grupo } from "@/lib/firestore";
 import {
   createGrupo,
   updateGrupo,
@@ -14,13 +15,21 @@ function formatDate(d: Date) {
 }
 
 export default async function GruposPage() {
-  const [grupos, disciplinas] = await Promise.all([
-    prisma.grupoTrabalho.findMany({
-      orderBy: { data: "desc" },
-      include: { disciplina: true, integrantes: true },
-    }),
-    prisma.disciplina.findMany({ orderBy: { nome: "asc" } }),
+  const [gruposSnap, disciplinasSnap] = await Promise.all([
+    db.collection("grupos").orderBy("data", "desc").get(),
+    db.collection("disciplinas").orderBy("nome", "asc").get(),
   ]);
+
+  const disciplinas = disciplinasSnap.docs.map((doc) => fromDoc<Disciplina>(doc));
+  const disciplinasPorId = new Map(disciplinas.map((d) => [d.id, d]));
+
+  const grupos = gruposSnap.docs.map((doc) => {
+    const grupo = fromDoc<Grupo>(doc);
+    return {
+      ...grupo,
+      disciplina: grupo.disciplinaId ? disciplinasPorId.get(grupo.disciplinaId) ?? null : null,
+    };
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,7 +120,7 @@ export default async function GruposPage() {
                   className="flex items-center gap-1 text-xs rounded-full border border-black/15 dark:border-white/15 pl-3 pr-1 py-1"
                 >
                   {integrante.nome}
-                  <form action={removeIntegrante.bind(null, integrante.id)}>
+                  <form action={removeIntegrante.bind(null, grupo.id, integrante.id)}>
                     <button
                       type="submit"
                       aria-label={`Remover ${integrante.nome}`}

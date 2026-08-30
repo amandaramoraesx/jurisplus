@@ -1,13 +1,31 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Professor, type Disciplina } from "@/lib/firestore";
 import { createProfessor, deleteProfessor } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfessoresPage() {
-  const professores = await prisma.professor.findMany({
-    orderBy: { nome: "asc" },
-    include: { disciplinas: true },
-  });
+  const [professoresSnap, disciplinasSnap] = await Promise.all([
+    db.collection("professores").orderBy("nome", "asc").get(),
+    db.collection("disciplinas").get(),
+  ]);
+
+  const disciplinasPorProfessor = new Map<string, number>();
+  for (const doc of disciplinasSnap.docs) {
+    const disciplina = fromDoc<Disciplina>(doc);
+    if (!disciplina.professorId) continue;
+    disciplinasPorProfessor.set(
+      disciplina.professorId,
+      (disciplinasPorProfessor.get(disciplina.professorId) || 0) + 1
+    );
+  }
+
+  const professores = professoresSnap.docs
+    .map((doc) => fromDoc<Professor>(doc))
+    .map((professor) => ({
+      ...professor,
+      totalDisciplinas: disciplinasPorProfessor.get(professor.id) || 0,
+    }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,7 +75,7 @@ export default async function ProfessoresPage() {
             <div>
               <p className="font-medium">{professor.nome}</p>
               <p className="text-xs text-foreground/60">
-                {professor.disciplinas.length} disciplina(s)
+                {professor.totalDisciplinas} disciplina(s)
                 {professor.email ? ` · ${professor.email}` : ""}
               </p>
             </div>

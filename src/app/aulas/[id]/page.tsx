@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
 import { updateAula, deleteAula, gerarResumoIA } from "../actions";
 import { isIAConfigured } from "@/lib/anthropic";
 
@@ -12,12 +13,22 @@ export default async function AulaDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const aula = await prisma.aula.findUnique({
-    where: { id },
-    include: { disciplina: true, favoritosVadeMecum: true },
-  });
+  const aulaDoc = await db.collection("aulas").doc(id).get();
+  if (!aulaDoc.exists) notFound();
+  const aulaBase = fromDoc<Aula>(aulaDoc);
 
-  if (!aula) notFound();
+  const [disciplinaDoc, favoritosSnap] = await Promise.all([
+    db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
+    db.collection("vademecum_favoritos").where("aulaId", "==", id).get(),
+  ]);
+
+  if (!disciplinaDoc.exists) notFound();
+
+  const aula = {
+    ...aulaBase,
+    disciplina: fromDoc<Disciplina>(disciplinaDoc),
+    favoritosVadeMecum: favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc)),
+  };
 
   return (
     <div className="flex flex-col gap-6">

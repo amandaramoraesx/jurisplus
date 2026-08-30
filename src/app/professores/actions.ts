@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
 export async function createProfessor(formData: FormData) {
@@ -10,12 +10,11 @@ export async function createProfessor(formData: FormData) {
 
   if (!nome) return;
 
-  await prisma.professor.create({
-    data: {
-      nome,
-      email: email || null,
-      telefone: telefone || null,
-    },
+  await db.collection("professores").add({
+    nome,
+    email: email || null,
+    telefone: telefone || null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/professores");
@@ -23,7 +22,18 @@ export async function createProfessor(formData: FormData) {
 }
 
 export async function deleteProfessor(id: string) {
-  await prisma.professor.delete({ where: { id } });
+  const disciplinasSnap = await db
+    .collection("disciplinas")
+    .where("professorId", "==", id)
+    .get();
+
+  const batch = db.batch();
+  for (const doc of disciplinasSnap.docs) {
+    batch.update(doc.ref, { professorId: null });
+  }
+  batch.delete(db.collection("professores").doc(id));
+  await batch.commit();
+
   revalidatePath("/professores");
   revalidatePath("/aulas");
 }

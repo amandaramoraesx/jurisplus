@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Disciplina, type Professor, type Aula } from "@/lib/firestore";
 import { createDisciplina, deleteDisciplina, createAula } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -9,16 +10,31 @@ function formatDate(d: Date) {
 }
 
 export default async function AulasPage() {
-  const [disciplinas, professores] = await Promise.all([
-    prisma.disciplina.findMany({
-      orderBy: { nome: "asc" },
-      include: {
-        professor: true,
-        aulas: { orderBy: { data: "desc" } },
-      },
-    }),
-    prisma.professor.findMany({ orderBy: { nome: "asc" } }),
+  const [disciplinasSnap, professoresSnap, aulasSnap] = await Promise.all([
+    db.collection("disciplinas").orderBy("nome", "asc").get(),
+    db.collection("professores").orderBy("nome", "asc").get(),
+    db.collection("aulas").orderBy("data", "desc").get(),
   ]);
+
+  const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
+  const professoresPorId = new Map(professores.map((p) => [p.id, p]));
+
+  const aulasPorDisciplina = new Map<string, Aula[]>();
+  for (const doc of aulasSnap.docs) {
+    const aula = fromDoc<Aula>(doc);
+    const lista = aulasPorDisciplina.get(aula.disciplinaId) || [];
+    lista.push(aula);
+    aulasPorDisciplina.set(aula.disciplinaId, lista);
+  }
+
+  const disciplinas = disciplinasSnap.docs.map((doc) => {
+    const disciplina = fromDoc<Disciplina>(doc);
+    return {
+      ...disciplina,
+      professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
+      aulas: aulasPorDisciplina.get(disciplina.id) || [],
+    };
+  });
 
   return (
     <div className="flex flex-col gap-6">

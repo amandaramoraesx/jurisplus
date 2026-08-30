@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Palestra } from "@/lib/firestore";
 import { createPalestra, deletePalestra } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,8 @@ function formatDate(d: Date) {
 }
 
 export default async function PalestrasPage() {
-  const palestras = await prisma.palestra.findMany({ orderBy: { data: "desc" } });
+  const palestrasSnap = await db.collection("palestras").orderBy("data", "desc").get();
+  const palestras = palestrasSnap.docs.map((doc) => fromDoc<Palestra>(doc));
   const totalHoras = palestras.reduce((acc, p) => acc + p.horas, 0);
 
   return (

@@ -1,6 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { dateOnlyKey } from "@/lib/firestore";
 import { revalidatePath } from "next/cache";
 
 function todayDateOnly() {
@@ -10,12 +11,15 @@ function todayDateOnly() {
 
 export async function marcarPresenca(disciplinaId: string, presente: boolean) {
   const data = todayDateOnly();
+  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
 
-  await prisma.presenca.upsert({
-    where: { disciplinaId_data: { disciplinaId, data } },
-    update: { presente },
-    create: { disciplinaId, data, presente },
-  });
+  await db
+    .collection("presencas")
+    .doc(id)
+    .set(
+      { disciplinaId, data, presente, createdAt: new Date() },
+      { merge: true }
+    );
 
   revalidatePath("/");
 }
@@ -27,14 +31,17 @@ export async function addNota(disciplinaId: string, formData: FormData) {
 
   if (!descricao || Number.isNaN(valor)) return;
 
-  await prisma.nota.create({
-    data: { disciplinaId, descricao, valor },
+  await db.collection("notas").add({
+    disciplinaId,
+    descricao,
+    valor,
+    createdAt: new Date(),
   });
 
   revalidatePath("/");
 }
 
 export async function deleteNota(id: string) {
-  await prisma.nota.delete({ where: { id } });
+  await db.collection("notas").doc(id).delete();
   revalidatePath("/");
 }

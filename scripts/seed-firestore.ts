@@ -1,7 +1,5 @@
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
-
-const prisma = new PrismaClient();
+import { db } from "../src/lib/firebase-admin";
 
 // Dataset inicial do Vade Mecum digital — pode ser expandido com o tempo.
 const artigos = [
@@ -54,22 +52,26 @@ const artigos = [
 ];
 
 async function main() {
+  const collection = db.collection("vademecum_artigos");
+  let criados = 0;
+
   for (const artigo of artigos) {
-    const existente = await prisma.vadeMecumArtigo.findFirst({
-      where: { codigo: artigo.codigo, numero: artigo.numero },
-    });
-    if (!existente) {
-      await prisma.vadeMecumArtigo.create({ data: artigo });
+    const existente = await collection
+      .where("codigo", "==", artigo.codigo)
+      .where("numero", "==", artigo.numero)
+      .limit(1)
+      .get();
+
+    if (existente.empty) {
+      await collection.add(artigo);
+      criados++;
     }
   }
-  console.log(`Seed concluído: ${artigos.length} artigos verificados/criados.`);
+
+  console.log(`Seed concluído: ${artigos.length} artigos verificados, ${criados} criados.`);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

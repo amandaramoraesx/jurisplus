@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
 export async function createPalestra(formData: FormData) {
@@ -13,20 +13,19 @@ export async function createPalestra(formData: FormData) {
 
   if (!tema || !dataStr || Number.isNaN(horas)) return;
 
-  await prisma.palestra.create({
-    data: {
-      tema,
-      data: new Date(dataStr),
-      horas,
-      local: local || null,
-      resumo: resumo || null,
-    },
+  await db.collection("palestras").add({
+    tema,
+    data: new Date(dataStr),
+    horas,
+    local: local || null,
+    resumo: resumo || null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/palestras");
 }
 
 export async function deletePalestra(id: string) {
-  await prisma.palestra.delete({ where: { id } });
+  await db.collection("palestras").doc(id).delete();
   revalidatePath("/palestras");
 }

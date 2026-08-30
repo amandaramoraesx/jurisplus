@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
 export async function createProva(formData: FormData) {
@@ -10,18 +10,17 @@ export async function createProva(formData: FormData) {
 
   if (!disciplinaId || !dataStr) return;
 
-  await prisma.prova.create({
-    data: {
-      disciplinaId,
-      data: new Date(dataStr),
-      conteudo: conteudo || null,
-    },
+  await db.collection("provas").add({
+    disciplinaId,
+    data: new Date(dataStr),
+    conteudo: conteudo || null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/provas");
 }
 
 export async function deleteProva(id: string) {
-  await prisma.prova.delete({ where: { id } });
+  await db.collection("provas").doc(id).delete();
   revalidatePath("/provas");
 }

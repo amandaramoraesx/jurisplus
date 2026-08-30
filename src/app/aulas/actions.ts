@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAnthropicClient } from "@/lib/anthropic";
@@ -12,19 +12,51 @@ export async function createDisciplina(formData: FormData) {
 
   if (!nome || !semestre) return;
 
-  await prisma.disciplina.create({
-    data: {
-      nome,
-      semestre,
-      professorId: professorId || null,
-    },
+  await db.collection("disciplinas").add({
+    nome,
+    semestre,
+    professorId: professorId || null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/aulas");
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
 export async function deleteDisciplina(id: string) {
-  await prisma.disciplina.delete({ where: { id } });
+  const [aulasSnap, presencasSnap, notasSnap, provasSnap, gruposSnap] = await Promise.all([
+    db.collection("aulas").where("disciplinaId", "==", id).get(),
+    db.collection("presencas").where("disciplinaId", "==", id).get(),
+    db.collection("notas").where("disciplinaId", "==", id).get(),
+    db.collection("provas").where("disciplinaId", "==", id).get(),
+    db.collection("grupos").where("disciplinaId", "==", id).get(),
+  ]);
+
+  const aulaIds = aulasSnap.docs.map((d) => d.id);
+  const favoritosSnaps = await Promise.all(
+    chunk(aulaIds, 10).map((ids) =>
+      ids.length ? db.collection("vademecum_favoritos").where("aulaId", "in", ids).get() : null
+    )
+  );
+
+  const batch = db.batch();
+  for (const doc of aulasSnap.docs) batch.delete(doc.ref);
+  for (const doc of presencasSnap.docs) batch.delete(doc.ref);
+  for (const doc of notasSnap.docs) batch.delete(doc.ref);
+  for (const doc of provasSnap.docs) batch.delete(doc.ref);
+  for (const doc of gruposSnap.docs) batch.update(doc.ref, { disciplinaId: null });
+  for (const snap of favoritosSnaps) {
+    if (!snap) continue;
+    for (const doc of snap.docs) batch.update(doc.ref, { aulaId: null });
+  }
+  batch.delete(db.collection("disciplinas").doc(id));
+  await batch.commit();
+
   revalidatePath("/aulas");
 }
 
@@ -34,14 +66,14 @@ export async function createAula(disciplinaId: string, formData: FormData) {
 
   if (!tema || !dataStr) return;
 
-  await prisma.aula.create({
-    data: {
-      disciplinaId,
-      tema,
-      data: new Date(dataStr),
-      resumo: String(formData.get("resumo") || "").trim() || null,
-      anotacoesLousa: String(formData.get("anotacoesLousa") || "").trim() || null,
-    },
+  await db.collection("aulas").add({
+    disciplinaId,
+    tema,
+    data: new Date(dataStr),
+    resumo: String(formData.get("resumo") || "").trim() || null,
+    anotacoesLousa: String(formData.get("anotacoesLousa") || "").trim() || null,
+    resumoIA: null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/aulas");
@@ -51,28 +83,39 @@ export async function updateAula(aulaId: string, formData: FormData) {
   const tema = String(formData.get("tema") || "").trim();
   const dataStr = String(formData.get("data") || "");
 
-  await prisma.aula.update({
-    where: { id: aulaId },
-    data: {
+  await db
+    .collection("aulas")
+    .doc(aulaId)
+    .update({
       tema,
-      data: dataStr ? new Date(dataStr) : undefined,
+      ...(dataStr ? { data: new Date(dataStr) } : {}),
       resumo: String(formData.get("resumo") || "").trim() || null,
       anotacoesLousa: String(formData.get("anotacoesLousa") || "").trim() || null,
-    },
-  });
+    });
 
   revalidatePath("/aulas");
   revalidatePath(`/aulas/${aulaId}`);
 }
 
 export async function deleteAula(aulaId: string, disciplinaId: string) {
-  await prisma.aula.delete({ where: { id: aulaId } });
+  const favoritosSnap = await db
+    .collection("vademecum_favoritos")
+    .where("aulaId", "==", aulaId)
+    .get();
+
+  const batch = db.batch();
+  for (const doc of favoritosSnap.docs) batch.update(doc.ref, { aulaId: null });
+  batch.delete(db.collection("aulas").doc(aulaId));
+  await batch.commit();
+
   revalidatePath("/aulas");
   redirect(`/aulas#${disciplinaId}`);
 }
 
 export async function gerarResumoIA(aulaId: string) {
-  const aula = await prisma.aula.findUniqueOrThrow({ where: { id: aulaId } });
+  const aulaDoc = await db.collection("aulas").doc(aulaId).get();
+  const aula = aulaDoc.data();
+  if (!aula) throw new Error("Aula não encontrada");
 
   if (!aula.resumo && !aula.anotacoesLousa) {
     return;
@@ -108,10 +151,7 @@ export async function gerarResumoIA(aulaId: string) {
     .join("\n")
     .trim();
 
-  await prisma.aula.update({
-    where: { id: aulaId },
-    data: { resumoIA },
-  });
+  await db.collection("aulas").doc(aulaId).update({ resumoIA });
 
   revalidatePath(`/aulas/${aulaId}`);
 }

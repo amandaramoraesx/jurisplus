@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
 export async function favoritarArtigo(formData: FormData) {
@@ -11,8 +11,12 @@ export async function favoritarArtigo(formData: FormData) {
 
   if (!codigo || !numero || !texto) return;
 
-  await prisma.vadeMecumFavorito.create({
-    data: { codigo, numero, texto, aulaId: aulaId || null },
+  await db.collection("vademecum_favoritos").add({
+    codigo,
+    numero,
+    texto,
+    aulaId: aulaId || null,
+    createdAt: new Date(),
   });
 
   revalidatePath("/vademecum");
@@ -21,15 +25,15 @@ export async function favoritarArtigo(formData: FormData) {
 export async function vincularFavoritoAula(favoritoId: string, formData: FormData) {
   const aulaId = String(formData.get("aulaId") || "").trim();
 
-  await prisma.vadeMecumFavorito.update({
-    where: { id: favoritoId },
-    data: { aulaId: aulaId || null },
-  });
+  await db
+    .collection("vademecum_favoritos")
+    .doc(favoritoId)
+    .update({ aulaId: aulaId || null });
 
   revalidatePath("/vademecum");
 }
 
 export async function removeFavorito(id: string) {
-  await prisma.vadeMecumFavorito.delete({ where: { id } });
+  await db.collection("vademecum_favoritos").doc(id).delete();
   revalidatePath("/vademecum");
 }

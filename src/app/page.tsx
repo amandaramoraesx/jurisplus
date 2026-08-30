@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Nota, type Presenca } from "@/lib/firestore";
 import { marcarPresenca, addNota, deleteNota } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -11,20 +12,47 @@ function todayDateOnly() {
 export default async function DashboardPage() {
   const hoje = todayDateOnly();
 
-  const disciplinas = await prisma.disciplina.findMany({
-    orderBy: { nome: "asc" },
-    include: {
-      professor: true,
-      aulas: true,
-      presencas: true,
-      notas: true,
-    },
+  const [disciplinasSnap, aulasSnap, presencasSnap, notasSnap] = await Promise.all([
+    db.collection("disciplinas").orderBy("nome", "asc").get(),
+    db.collection("aulas").get(),
+    db.collection("presencas").get(),
+    db.collection("notas").get(),
+  ]);
+
+  const aulas = aulasSnap.docs.map((doc) => fromDoc<Aula>(doc));
+  const presencas = presencasSnap.docs.map((doc) => fromDoc<Presenca>(doc));
+  const notas = notasSnap.docs.map((doc) => fromDoc<Nota>(doc));
+
+  const aulasPorDisciplina = new Map<string, Aula[]>();
+  for (const aula of aulas) {
+    aulasPorDisciplina.set(aula.disciplinaId, [...(aulasPorDisciplina.get(aula.disciplinaId) || []), aula]);
+  }
+  const presencasPorDisciplina = new Map<string, Presenca[]>();
+  for (const presenca of presencas) {
+    presencasPorDisciplina.set(
+      presenca.disciplinaId,
+      [...(presencasPorDisciplina.get(presenca.disciplinaId) || []), presenca]
+    );
+  }
+  const notasPorDisciplina = new Map<string, Nota[]>();
+  for (const nota of notas) {
+    notasPorDisciplina.set(nota.disciplinaId, [...(notasPorDisciplina.get(nota.disciplinaId) || []), nota]);
+  }
+
+  const disciplinas = disciplinasSnap.docs.map((doc) => {
+    const disciplina = fromDoc<Disciplina>(doc);
+    return {
+      ...disciplina,
+      aulas: aulasPorDisciplina.get(disciplina.id) || [],
+      presencas: presencasPorDisciplina.get(disciplina.id) || [],
+      notas: notasPorDisciplina.get(disciplina.id) || [],
+    };
   });
 
-  const presencasHoje = await prisma.presenca.findMany({
-    where: { data: hoje },
-  });
-  const presencaHojeMap = new Map(presencasHoje.map((p) => [p.disciplinaId, p.presente]));
+  const hojeKey = dateOnlyKey(hoje);
+  const presencaHojeMap = new Map(
+    presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])
+  );
 
   return (
     <div className="flex flex-col gap-8">

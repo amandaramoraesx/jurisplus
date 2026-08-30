@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Aula, type Disciplina, type Prova } from "@/lib/firestore";
 import { createProva, deleteProva } from "./actions";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
 
@@ -16,17 +17,30 @@ function formatDate(d: Date) {
 }
 
 export default async function ProvasPage() {
-  const [provas, disciplinas] = await Promise.all([
-    prisma.prova.findMany({
-      orderBy: { data: "asc" },
-      include: {
-        disciplina: {
-          include: { aulas: { orderBy: { data: "desc" } } },
-        },
-      },
-    }),
-    prisma.disciplina.findMany({ orderBy: { nome: "asc" } }),
+  const [provasSnap, disciplinasSnap, aulasSnap] = await Promise.all([
+    db.collection("provas").orderBy("data", "asc").get(),
+    db.collection("disciplinas").orderBy("nome", "asc").get(),
+    db.collection("aulas").orderBy("data", "desc").get(),
   ]);
+
+  const disciplinas = disciplinasSnap.docs.map((doc) => fromDoc<Disciplina>(doc));
+  const disciplinasPorId = new Map(disciplinas.map((d) => [d.id, d]));
+
+  const aulasPorDisciplina = new Map<string, Aula[]>();
+  for (const doc of aulasSnap.docs) {
+    const aula = fromDoc<Aula>(doc);
+    aulasPorDisciplina.set(aula.disciplinaId, [...(aulasPorDisciplina.get(aula.disciplinaId) || []), aula]);
+  }
+
+  const provas = provasSnap.docs
+    .map((doc) => fromDoc<Prova>(doc))
+    .map((prova) => ({
+      ...prova,
+      disciplina: {
+        ...disciplinasPorId.get(prova.disciplinaId)!,
+        aulas: aulasPorDisciplina.get(prova.disciplinaId) || [],
+      },
+    }));
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,7 +1,17 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/firebase-admin";
+import { fromDoc, type Aula, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
 import { favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+function correspondeAoTermo(artigo: VadeMecumArtigo, termo: string) {
+  const alvo = termo.toLowerCase();
+  return (
+    artigo.codigo.toLowerCase().includes(alvo) ||
+    artigo.numero.toLowerCase().includes(alvo) ||
+    artigo.texto.toLowerCase().includes(alvo)
+  );
+}
 
 export default async function VadeMecumPage({
   searchParams,
@@ -11,28 +21,29 @@ export default async function VadeMecumPage({
   const { q } = await searchParams;
   const termo = (q || "").trim();
 
-  const [resultados, favoritos, aulas] = await Promise.all([
-    termo
-      ? prisma.vadeMecumArtigo.findMany({
-          where: {
-            OR: [
-              { codigo: { contains: termo } },
-              { numero: { contains: termo } },
-              { texto: { contains: termo } },
-            ],
-          },
-          take: 20,
-        })
-      : Promise.resolve([]),
-    prisma.vadeMecumFavorito.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { aula: { include: { disciplina: true } } },
-    }),
-    prisma.aula.findMany({
-      orderBy: { data: "desc" },
-      include: { disciplina: true },
-    }),
+  const [artigosSnap, favoritosSnap, aulasSnap, disciplinasSnap] = await Promise.all([
+    termo ? db.collection("vademecum_artigos").get() : Promise.resolve(null),
+    db.collection("vademecum_favoritos").orderBy("createdAt", "desc").get(),
+    db.collection("aulas").orderBy("data", "desc").get(),
+    db.collection("disciplinas").get(),
   ]);
+
+  const disciplinasPorId = new Map(
+    disciplinasSnap.docs.map((doc) => [doc.id, fromDoc<Disciplina>(doc)])
+  );
+  const aulas = aulasSnap.docs.map((doc) => {
+    const aula = fromDoc<Aula>(doc);
+    return { ...aula, disciplina: disciplinasPorId.get(aula.disciplinaId)! };
+  });
+
+  const resultados = artigosSnap
+    ? artigosSnap.docs
+        .map((doc) => fromDoc<VadeMecumArtigo>(doc))
+        .filter((artigo) => correspondeAoTermo(artigo, termo))
+        .slice(0, 20)
+    : [];
+
+  const favoritos = favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc));
 
   return (
     <div className="flex flex-col gap-8">

@@ -1,6 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { randomUUID } from "crypto";
+import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
 function splitNomes(raw: string) {
@@ -19,16 +20,13 @@ export async function createGrupo(formData: FormData) {
 
   if (!tema || !dataStr) return;
 
-  await prisma.grupoTrabalho.create({
-    data: {
-      tema,
-      data: new Date(dataStr),
-      disciplinaId: disciplinaId || null,
-      apresentacao: apresentacao || null,
-      integrantes: {
-        create: splitNomes(integrantesRaw).map((nome) => ({ nome })),
-      },
-    },
+  await db.collection("grupos").add({
+    tema,
+    data: new Date(dataStr),
+    disciplinaId: disciplinaId || null,
+    apresentacao: apresentacao || null,
+    integrantes: splitNomes(integrantesRaw).map((nome) => ({ id: randomUUID(), nome })),
+    createdAt: new Date(),
   });
 
   revalidatePath("/grupos");
@@ -40,21 +38,21 @@ export async function updateGrupo(grupoId: string, formData: FormData) {
   const disciplinaId = String(formData.get("disciplinaId") || "").trim();
   const apresentacao = String(formData.get("apresentacao") || "").trim();
 
-  await prisma.grupoTrabalho.update({
-    where: { id: grupoId },
-    data: {
+  await db
+    .collection("grupos")
+    .doc(grupoId)
+    .update({
       tema,
-      data: dataStr ? new Date(dataStr) : undefined,
+      ...(dataStr ? { data: new Date(dataStr) } : {}),
       disciplinaId: disciplinaId || null,
       apresentacao: apresentacao || null,
-    },
-  });
+    });
 
   revalidatePath("/grupos");
 }
 
 export async function deleteGrupo(id: string) {
-  await prisma.grupoTrabalho.delete({ where: { id } });
+  await db.collection("grupos").doc(id).delete();
   revalidatePath("/grupos");
 }
 
@@ -62,11 +60,23 @@ export async function addIntegrante(grupoId: string, formData: FormData) {
   const nome = String(formData.get("nome") || "").trim();
   if (!nome) return;
 
-  await prisma.integranteGrupo.create({ data: { grupoId, nome } });
+  const ref = db.collection("grupos").doc(grupoId);
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    const integrantes = (doc.data()?.integrantes as { id: string; nome: string }[]) || [];
+    tx.update(ref, { integrantes: [...integrantes, { id: randomUUID(), nome }] });
+  });
+
   revalidatePath("/grupos");
 }
 
-export async function removeIntegrante(id: string) {
-  await prisma.integranteGrupo.delete({ where: { id } });
+export async function removeIntegrante(grupoId: string, integranteId: string) {
+  const ref = db.collection("grupos").doc(grupoId);
+  await db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    const integrantes = (doc.data()?.integrantes as { id: string; nome: string }[]) || [];
+    tx.update(ref, { integrantes: integrantes.filter((i) => i.id !== integranteId) });
+  });
+
   revalidatePath("/grupos");
 }

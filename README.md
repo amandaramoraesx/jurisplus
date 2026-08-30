@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Configuração (Juris+)
+
+O banco de dados é o [Firestore](https://firebase.google.com/docs/firestore), acessado pelo servidor via Admin SDK. Copie `.env.example` para `.env` e preencha `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` e `FIREBASE_PRIVATE_KEY` com os dados de uma Service Account (Console do Firebase → Configurações do projeto → Contas de serviço → Gerar nova chave privada). Depois rode `npm run db:seed` para popular a base inicial do Vade Mecum.
+
 ## Getting Started
 
 First, run the development server:
