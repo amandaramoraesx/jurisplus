@@ -1,0 +1,14 @@
+# Configuração do Firebase App Hosting.
+# FIREBASE_PRIVATE_KEY não fica aqui (é sensível) — é configurada manualmente
+# no Console do Firebase (App Hosting > backend jurisplus > variáveis de ambiente).
+env:
+  - variable: FIREBASE_PROJECT_ID
+    value: juris-plus
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: FIREBASE_CLIENT_EMAIL
+    value: firebase-adminsdk-fbsvc@juris-plus.iam.gserviceaccount.com
+    availability:
+      - BUILD
+      - RUNTIME
