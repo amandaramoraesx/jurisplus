@@ -20,6 +20,7 @@ export async function favoritarArtigo(formData: FormData) {
   const numero = String(formData.get("numero") || "").trim();
   const texto = String(formData.get("texto") || "").trim();
   const aulaId = String(formData.get("aulaId") || "").trim();
+  const fonte = String(formData.get("fonte") || "").trim();
 
   if (!codigo || !numero || !texto) return;
 
@@ -29,6 +30,7 @@ export async function favoritarArtigo(formData: FormData) {
     texto,
     aulaId: aulaId || null,
     createdAt: new Date(),
+    fonte: fonte || null,
   });
 
   revalidatePath("/vademecum");

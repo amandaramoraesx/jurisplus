@@ -47,7 +47,9 @@ export default async function VadeMecumPage({
       <div>
         <h1 className="text-2xl font-bold">Vade Mecum digital</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque por código, número ou palavras do texto de um artigo que você mesma cadastrou aqui embaixo.
+          Busque por código, número ou palavras do texto — CF, Código Civil, Código Penal e CPC já vêm
+          carregados direto do texto oficial (planalto.gov.br). Não achou uma lei específica? Cadastre
+          ela manualmente aqui embaixo.
         </p>
       </div>
 
@@ -103,10 +105,21 @@ export default async function VadeMecumPage({
                 {artigo.codigo}, art. {artigo.numero}
               </p>
               <p className="text-sm text-foreground/80">{artigo.texto}</p>
+              {artigo.fonte && (
+                <a
+                  href={artigo.fonte}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-foreground/40 hover:underline self-start"
+                >
+                  Fonte: planalto.gov.br ↗
+                </a>
+              )}
               <form action={favoritarArtigo} className="flex flex-wrap items-center gap-2 mt-1">
                 <input type="hidden" name="codigo" value={artigo.codigo} />
                 <input type="hidden" name="numero" value={artigo.numero} />
                 <input type="hidden" name="texto" value={artigo.texto} />
+                <input type="hidden" name="fonte" value={artigo.fonte ?? ""} />
                 <select
                   name="aulaId"
                   defaultValue=""
@@ -157,6 +170,16 @@ export default async function VadeMecumPage({
               </form>
             </div>
             <p className="text-sm text-foreground/80">{fav.texto}</p>
+            {fav.fonte && (
+              <a
+                href={fav.fonte}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-foreground/40 hover:underline self-start"
+              >
+                Fonte: planalto.gov.br ↗
+              </a>
+            )}
             <form action={vincularFavoritoAula.bind(null, fav.id)} className="flex items-center gap-2">
               <select
                 name="aulaId"

@@ -90,6 +90,7 @@ export type VadeMecumArtigo = {
   codigo: string;
   numero: string;
   texto: string;
+  fonte?: string | null;
 };
 
 export type VadeMecumFavorito = {
@@ -99,6 +100,7 @@ export type VadeMecumFavorito = {
   texto: string;
   aulaId: string | null;
   createdAt: Date;
+  fonte?: string | null;
 };
 
 export type PushSubscriptionDoc = {
