@@ -146,10 +146,30 @@ body {
 .disclosure summary {
   cursor: pointer;
   list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .disclosure summary::-webkit-details-marker {
   display: none;
+}
+
+.disclosure summary::after {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-left: auto;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  opacity: 0.45;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.disclosure[open] > summary::after {
+  transform: rotate(-135deg);
 }
 
 @media print {
