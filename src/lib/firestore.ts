@@ -22,6 +22,10 @@ export type Disciplina = {
   semestre: string;
   professorId: string | null;
   createdAt: Date;
+  /** Dias da semana em que a disciplina tem aula (0=domingo...6=sábado, igual Date.getDay()). */
+  diasSemana?: number[];
+  /** Texto livre pra exibir o horário, ex: "19:10 às 20:25". */
+  horario?: string | null;
   quizIA?: QuizPergunta[] | null;
   quizIAGeradoEm?: Date | null;
 };
@@ -145,3 +149,16 @@ export function dateOnlyKey(date: Date) {
 export function hashEndpoint(endpoint: string) {
   return createHash("sha256").update(endpoint).digest("hex");
 }
+
+/** Nomes dos dias da semana, no mesmo índice de Date.getDay() (0=domingo...6=sábado). */
+export const DIAS_SEMANA = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+] as const;
+
+export const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;

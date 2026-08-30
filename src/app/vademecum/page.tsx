@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
 import { criarArtigo, favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
+import { VademecumSearchBar } from "@/components/VademecumSearchBar";
 
 export const dynamic = "force-dynamic";
 
@@ -47,26 +48,13 @@ export default async function VadeMecumPage({
       <div>
         <h1 className="text-2xl font-bold">⚖️ Vade Mecum digital</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque por código, número ou palavras do texto — CF, Código Civil, Código Penal e CPC já vêm
-          carregados direto do texto oficial (planalto.gov.br). Não achou uma lei específica? Cadastre
-          ela manualmente aqui embaixo.
+          Comece a digitar que o resultado aparece sozinho — busca por código, número ou palavras do
+          texto. CF, Código Civil, Código Penal e CPC já vêm carregados direto do texto oficial
+          (planalto.gov.br). Não achou uma lei específica? Cadastre ela manualmente aqui embaixo.
         </p>
       </div>
 
-      <form method="GET" className="flex gap-2">
-        <input
-          name="q"
-          defaultValue={termo}
-          placeholder='Ex: "CC 186", "homicídio", "art. 5"...'
-          className="flex-1 field"
-        />
-        <button
-          type="submit"
-          className="btn-primary"
-        >
-          🔍 Buscar
-        </button>
-      </form>
+      <VademecumSearchBar termoInicial={termo} />
 
       <details className="disclosure card">
         <summary className="font-semibold text-sm text-foreground/70">Cadastrar artigo</summary>

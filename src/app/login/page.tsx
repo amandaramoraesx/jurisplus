@@ -68,6 +68,15 @@ export default function LoginPage() {
             {carregando ? "Entrando..." : "Entrar"}
           </button>
         </form>
+
+        <a
+          href="https://wa.me/5515998430109"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 text-sm text-foreground/60 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+        >
+          💬 Suporte via WhatsApp: (15) 99843-0109
+        </a>
       </div>
     </div>
   );

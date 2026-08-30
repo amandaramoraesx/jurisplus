@@ -7,6 +7,7 @@ import {
   type Aula,
   type Prova,
   type Nota,
+  DIAS_SEMANA_ABREV,
 } from "@/lib/firestore";
 import {
   createDisciplina,
@@ -137,6 +138,20 @@ export default async function AcademicoPage({
                     </option>
                   ))}
                 </select>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-foreground/60">
+                    Dias da semana com aula (calendário fixo do semestre)
+                  </span>
+                  <div className="flex flex-wrap gap-3">
+                    {DIAS_SEMANA_ABREV.map((label, i) => (
+                      <label key={i} className="flex items-center gap-1.5 text-xs">
+                        <input type="checkbox" name="diasSemana" value={i} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <input name="horario" placeholder="Horário (opcional, ex: 19:10 às 22:00)" className="field" />
                 <button type="submit" className="self-start btn-primary">
                   Criar disciplina
                 </button>
@@ -160,6 +175,12 @@ export default async function AcademicoPage({
                       {disciplina.semestre}
                       {disciplina.professor ? ` · ${disciplina.professor.nome}` : ""}
                     </p>
+                    {disciplina.diasSemana && disciplina.diasSemana.length > 0 && (
+                      <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+                        🗓️ {disciplina.diasSemana.map((d) => DIAS_SEMANA_ABREV[d]).join(", ")}
+                        {disciplina.horario ? ` · ${disciplina.horario}` : ""}
+                      </p>
+                    )}
                   </div>
                   {isAdmin && (
                     <form action={deleteDisciplina.bind(null, disciplina.id)}>
@@ -194,6 +215,30 @@ export default async function AcademicoPage({
                           </option>
                         ))}
                       </select>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-foreground/60">
+                          Dias da semana com aula (calendário fixo do semestre)
+                        </span>
+                        <div className="flex flex-wrap gap-3">
+                          {DIAS_SEMANA_ABREV.map((label, i) => (
+                            <label key={i} className="flex items-center gap-1.5 text-xs">
+                              <input
+                                type="checkbox"
+                                name="diasSemana"
+                                value={i}
+                                defaultChecked={disciplina.diasSemana?.includes(i)}
+                              />
+                              {label}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        name="horario"
+                        placeholder="Horário (opcional, ex: 19:10 às 22:00)"
+                        defaultValue={disciplina.horario ?? ""}
+                        className="field"
+                      />
                       <button type="submit" className="self-start btn-primary">
                         Salvar alterações
                       </button>

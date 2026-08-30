@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
-import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor } from "@/lib/firestore";
+import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor, DIAS_SEMANA } from "@/lib/firestore";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -9,6 +9,74 @@ export const dynamic = "force-dynamic";
 function todayDateOnly() {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+type DisciplinaComExtras = Disciplina & {
+  professor: Professor | null;
+  totalAulas: number;
+  presencas: Presenca[];
+  anotacaoHoje: { resumo: string; anotacoesLousa: string };
+};
+
+function AnotarDisciplinaDetails({
+  disciplina,
+  hojeKey,
+}: {
+  disciplina: DisciplinaComExtras;
+  hojeKey: string;
+}) {
+  return (
+    <details className="disclosure">
+      <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
+        <span>
+          {disciplina.nome}
+          {disciplina.professor ? (
+            <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
+          ) : null}
+        </span>
+        {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
+          <span className="text-[10px] rounded-full px-2 py-0.5 bg-green-600/10 text-green-700 dark:text-green-400 shrink-0">
+            ✅ já tem anotação hoje
+          </span>
+        )}
+      </summary>
+      <form action={anotarRapido.bind(null, disciplina.id)} className="flex flex-col gap-3 mt-2">
+        <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
+          Anotações
+          <textarea
+            name="resumo"
+            defaultValue={disciplina.anotacaoHoje.resumo}
+            rows={4}
+            placeholder="Suas anotações sobre a aula..."
+            className="field"
+          />
+        </label>
+        <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
+          Lousa
+          <textarea
+            name="anotacoesLousa"
+            defaultValue={disciplina.anotacaoHoje.anotacoesLousa}
+            rows={4}
+            placeholder="O que o professor escreveu na lousa..."
+            className="field font-mono"
+          />
+        </label>
+        <div className="flex items-center gap-3">
+          <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
+            💾 Salvar anotação
+          </SubmitButton>
+          {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
+            <Link
+              href={`/aulas/${disciplina.id}_${hojeKey}`}
+              className="text-xs text-foreground/60 hover:underline"
+            >
+              🖨️ Ver aula e gerar PDF →
+            </Link>
+          )}
+        </div>
+      </form>
+    </details>
+  );
 }
 
 export default async function DashboardPage() {
@@ -67,7 +135,15 @@ export default async function DashboardPage() {
   const presencaHojeMap = new Map(
     presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])
   );
-  const checkinsFeitos = disciplinas.filter((d) => presencaHojeMap.has(d.id)).length;
+
+  const hojeDiaSemana = hoje.getDay();
+  // Disciplina sem calendário definido ainda aparece sempre (não trava o check-in de ninguém).
+  const temHoje = (d: (typeof disciplinas)[number]) =>
+    !d.diasSemana || d.diasSemana.length === 0 || d.diasSemana.includes(hojeDiaSemana);
+  const disciplinasHoje = disciplinas.filter(temHoje);
+  const disciplinasOutras = disciplinas.filter((d) => !temHoje(d));
+
+  const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
 
   return (
     <div className="flex flex-col gap-5">
@@ -89,6 +165,16 @@ export default async function DashboardPage() {
               Cadastre suas disciplinas na aba Acadêmico para começar a fazer check-in.
             </p>
           </div>
+        ) : disciplinasHoje.length === 0 ? (
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <span className="icon-badge bg-green-600/10 text-green-700 dark:text-green-400">✅</span>
+              Check-in de hoje
+            </h2>
+            <p className="text-sm text-foreground/60 mt-2">
+              🎉 Nenhuma aula prevista pra hoje ({DIAS_SEMANA[hojeDiaSemana]}) no calendário do semestre.
+            </p>
+          </div>
         ) : (
           <>
             <div className="flex items-center justify-between gap-3">
@@ -98,10 +184,10 @@ export default async function DashboardPage() {
                   Check-in de hoje
                 </h2>
                 <p className="text-xs text-foreground/60 mt-0.5">
-                  {checkinsFeitos} de {disciplinas.length} disciplina(s) já registrada(s)
+                  {checkinsFeitos} de {disciplinasHoje.length} disciplina(s) já registrada(s)
                 </p>
               </div>
-              <form action={marcarTodasPresentes}>
+              <form action={marcarTodasPresentes.bind(null, disciplinasHoje.map((d) => d.id))}>
                 <SubmitButton savedLabel="✅ Check-in feito!" pendingLabel="Marcando...">
                   🎯 Fazer check-in
                 </SubmitButton>
@@ -111,7 +197,7 @@ export default async function DashboardPage() {
             <details className="disclosure">
               <summary className="btn-ghost inline-block">✏️ Corrigir uma disciplina específica</summary>
               <div className="flex flex-col gap-2 mt-3">
-                {disciplinas.map((disciplina) => {
+                {disciplinasHoje.map((disciplina) => {
                   const status = presencaHojeMap.get(disciplina.id);
                   return (
                     <div
@@ -154,9 +240,58 @@ export default async function DashboardPage() {
             </details>
           </>
         )}
+
+        {disciplinasOutras.length > 0 && (
+          <details className="disclosure">
+            <summary className="btn-ghost inline-block">
+              📅 Outra disciplina fora do horário de hoje
+            </summary>
+            <div className="flex flex-col gap-2 mt-3">
+              {disciplinasOutras.map((disciplina) => {
+                const status = presencaHojeMap.get(disciplina.id);
+                return (
+                  <div
+                    key={disciplina.id}
+                    className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
+                  >
+                    <span className="text-sm font-medium">{disciplina.nome}</span>
+                    <div className="flex gap-2">
+                      <form action={marcarPresenca.bind(null, disciplina.id, true)}>
+                        <SubmitButton
+                          pendingLabel="..."
+                          savedLabel="Presente"
+                          className={`text-xs rounded-full px-3 py-1 border ${
+                            status === true
+                              ? "bg-green-600 text-white border-green-600"
+                              : "border-black/15 dark:border-white/20 text-foreground/70"
+                          }`}
+                        >
+                          Presente
+                        </SubmitButton>
+                      </form>
+                      <form action={marcarPresenca.bind(null, disciplina.id, false)}>
+                        <SubmitButton
+                          pendingLabel="..."
+                          savedLabel="Faltei"
+                          className={`text-xs rounded-full px-3 py-1 border ${
+                            status === false
+                              ? "bg-red-600 text-white border-red-600"
+                              : "border-black/15 dark:border-white/20 text-foreground/70"
+                          }`}
+                        >
+                          Faltei
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+        )}
       </section>
 
-      {disciplinas.length > 0 && (
+      {disciplinasHoje.length > 0 && (
         <section className="card flex flex-col gap-3">
           <div>
             <h2 className="font-semibold flex items-center gap-2">
@@ -168,62 +303,33 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            {disciplinas.map((disciplina) => (
-              <details key={disciplina.id} className="disclosure">
-                <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
-                  <span>
-                    {disciplina.nome}
-                    {disciplina.professor ? (
-                      <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
-                    ) : null}
-                  </span>
-                  {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
-                    <span className="text-[10px] rounded-full px-2 py-0.5 bg-green-600/10 text-green-700 dark:text-green-400 shrink-0">
-                      ✅ já tem anotação hoje
-                    </span>
-                  )}
-                </summary>
-                <form
-                  action={anotarRapido.bind(null, disciplina.id)}
-                  className="flex flex-col gap-3 mt-2"
-                >
-                  <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
-                    Anotações
-                    <textarea
-                      name="resumo"
-                      defaultValue={disciplina.anotacaoHoje.resumo}
-                      rows={4}
-                      placeholder="Suas anotações sobre a aula..."
-                      className="field"
-                    />
-                  </label>
-                  <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
-                    Lousa
-                    <textarea
-                      name="anotacoesLousa"
-                      defaultValue={disciplina.anotacaoHoje.anotacoesLousa}
-                      rows={4}
-                      placeholder="O que o professor escreveu na lousa..."
-                      className="field font-mono"
-                    />
-                  </label>
-                  <div className="flex items-center gap-3">
-                    <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
-                      💾 Salvar anotação
-                    </SubmitButton>
-                    {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
-                      <Link
-                        href={`/aulas/${disciplina.id}_${hojeKey}`}
-                        className="text-xs text-foreground/60 hover:underline"
-                      >
-                        🖨️ Ver aula e gerar PDF →
-                      </Link>
-                    )}
-                  </div>
-                </form>
-              </details>
+            {disciplinasHoje.map((disciplina) => (
+              <AnotarDisciplinaDetails
+                key={disciplina.id}
+                disciplina={disciplina}
+                hojeKey={hojeKey}
+              />
             ))}
           </div>
+        </section>
+      )}
+
+      {disciplinasOutras.length > 0 && (
+        <section className="card">
+          <details className="disclosure">
+            <summary className="text-sm text-foreground/70 font-medium">
+              📝 Anotar em outra disciplina fora do horário de hoje
+            </summary>
+            <div className="flex flex-col gap-2 mt-3">
+              {disciplinasOutras.map((disciplina) => (
+                <AnotarDisciplinaDetails
+                  key={disciplina.id}
+                  disciplina={disciplina}
+                  hojeKey={hojeKey}
+                />
+              ))}
+            </div>
+          </details>
         </section>
       )}
 

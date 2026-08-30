@@ -6,12 +6,21 @@ import { redirect } from "next/navigation";
 import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
 import { requireAdmin } from "@/lib/auth";
 
+function parseDiasSemana(formData: FormData): number[] {
+  return formData
+    .getAll("diasSemana")
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+}
+
 export async function createDisciplina(formData: FormData) {
   await requireAdmin();
 
   const nome = String(formData.get("nome") || "").trim();
   const semestre = String(formData.get("semestre") || "").trim();
   const professorId = String(formData.get("professorId") || "").trim();
+  const horario = String(formData.get("horario") || "").trim();
+  const diasSemana = parseDiasSemana(formData);
 
   if (!nome || !semestre) return;
 
@@ -19,10 +28,13 @@ export async function createDisciplina(formData: FormData) {
     nome,
     semestre,
     professorId: professorId || null,
+    diasSemana,
+    horario: horario || null,
     createdAt: new Date(),
   });
 
   revalidatePath("/aulas");
+  revalidatePath("/");
 }
 
 export async function updateDisciplina(id: string, formData: FormData) {
@@ -31,6 +43,8 @@ export async function updateDisciplina(id: string, formData: FormData) {
   const nome = String(formData.get("nome") || "").trim();
   const semestre = String(formData.get("semestre") || "").trim();
   const professorId = String(formData.get("professorId") || "").trim();
+  const horario = String(formData.get("horario") || "").trim();
+  const diasSemana = parseDiasSemana(formData);
 
   if (!nome || !semestre) return;
 
@@ -41,9 +55,12 @@ export async function updateDisciplina(id: string, formData: FormData) {
       nome,
       semestre,
       professorId: professorId || null,
+      diasSemana,
+      horario: horario || null,
     });
 
   revalidatePath("/aulas");
+  revalidatePath("/");
 }
 
 function chunk<T>(items: T[], size: number): T[][] {

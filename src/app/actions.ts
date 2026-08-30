@@ -24,16 +24,15 @@ export async function marcarPresenca(disciplinaId: string, presente: boolean) {
   revalidatePath("/");
 }
 
-export async function marcarTodasPresentes() {
+export async function marcarTodasPresentes(disciplinaIds: string[]) {
   const data = todayDateOnly();
-  const disciplinasSnap = await db.collection("disciplinas").get();
 
   const batch = db.batch();
-  for (const doc of disciplinasSnap.docs) {
-    const id = `${doc.id}_${dateOnlyKey(data)}`;
+  for (const disciplinaId of disciplinaIds) {
+    const id = `${disciplinaId}_${dateOnlyKey(data)}`;
     batch.set(
       db.collection("presencas").doc(id),
-      { disciplinaId: doc.id, data, presente: true, createdAt: new Date() },
+      { disciplinaId, data, presente: true, createdAt: new Date() },
       { merge: true }
     );
   }
