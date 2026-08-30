@@ -1,16 +1,13 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
-import { favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
+import { criarArtigo, favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 function correspondeAoTermo(artigo: VadeMecumArtigo, termo: string) {
-  const alvo = termo.toLowerCase();
-  return (
-    artigo.codigo.toLowerCase().includes(alvo) ||
-    artigo.numero.toLowerCase().includes(alvo) ||
-    artigo.texto.toLowerCase().includes(alvo)
-  );
+  const palavras = termo.toLowerCase().split(/\s+/).filter(Boolean);
+  const alvo = `${artigo.codigo} ${artigo.numero} ${artigo.texto}`.toLowerCase();
+  return palavras.every((palavra) => alvo.includes(palavra));
 }
 
 export default async function VadeMecumPage({
@@ -50,7 +47,7 @@ export default async function VadeMecumPage({
       <div>
         <h1 className="text-2xl font-bold">Vade Mecum digital</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque por código (CF, CC, CP, CPC) ou número do artigo.
+          Busque por código, número ou palavras do texto de um artigo que você mesma cadastrou aqui embaixo.
         </p>
       </div>
 
@@ -58,7 +55,7 @@ export default async function VadeMecumPage({
         <input
           name="q"
           defaultValue={termo}
-          placeholder='Ex: "art. 5", "CC 186", "homicídio"...'
+          placeholder='Ex: "CC 186", "homicídio", "art. 5"...'
           className="flex-1 field"
         />
         <button
@@ -69,12 +66,32 @@ export default async function VadeMecumPage({
         </button>
       </form>
 
+      <details className="disclosure card">
+        <summary className="font-semibold text-sm text-foreground/70">Cadastrar artigo</summary>
+        <form action={criarArtigo} className="flex flex-col gap-3 mt-3">
+          <div className="flex gap-3">
+            <input name="codigo" placeholder="Código (ex: CF, CC, CP, CPC)" required className="w-32 field" />
+            <input name="numero" placeholder="Número (ex: 5º, 186)" required className="flex-1 field" />
+          </div>
+          <textarea
+            name="texto"
+            placeholder="Texto completo do artigo"
+            required
+            rows={3}
+            className="field"
+          />
+          <button type="submit" className="self-start btn-primary">
+            Adicionar ao Vade Mecum
+          </button>
+        </form>
+      </details>
+
       {termo && (
         <div className="flex flex-col gap-3">
           {resultados.length === 0 && (
             <p className="text-sm text-foreground/60">
-              Nenhum artigo encontrado para &ldquo;{termo}&rdquo;. A base ainda é pequena — vamos
-              expandindo com o tempo.
+              Nenhum artigo encontrado para &ldquo;{termo}&rdquo;. Use &ldquo;Cadastrar artigo&rdquo; acima
+              para adicionar os artigos que você quer poder buscar depois.
             </p>
           )}
           {resultados.map((artigo) => (

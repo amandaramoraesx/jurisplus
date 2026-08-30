@@ -3,6 +3,18 @@
 import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 
+export async function criarArtigo(formData: FormData) {
+  const codigo = String(formData.get("codigo") || "").trim();
+  const numero = String(formData.get("numero") || "").trim();
+  const texto = String(formData.get("texto") || "").trim();
+
+  if (!codigo || !numero || !texto) return;
+
+  await db.collection("vademecum_artigos").add({ codigo, numero, texto });
+
+  revalidatePath("/vademecum");
+}
+
 export async function favoritarArtigo(formData: FormData) {
   const codigo = String(formData.get("codigo") || "").trim();
   const numero = String(formData.get("numero") || "").trim();
