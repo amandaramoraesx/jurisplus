@@ -16,9 +16,10 @@ export default async function PalestrasPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Palestras e horas complementares</h1>
+        <h1 className="text-2xl font-bold">🎤 Palestras e horas complementares</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Total acumulado: <span className="font-semibold">{totalHoras}h</span>
+          Total acumulado:{" "}
+          <span className="font-semibold text-amber-700 dark:text-amber-400">⏱️ {totalHoras}h</span>
         </p>
       </div>
 
@@ -64,12 +65,12 @@ export default async function PalestrasPage() {
           <div key={p.id} className="card flex flex-col gap-1">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold">{p.tema}</p>
+                <p className="font-semibold">🎤 {p.tema}</p>
                 {p.palestrante && (
                   <p className="text-xs text-foreground/70">Por {p.palestrante}</p>
                 )}
               </div>
-              <span className="text-xs text-foreground/60 shrink-0">
+              <span className="text-xs shrink-0 rounded-full px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400">
                 {formatDate(p.data)} · {p.horas}h
               </span>
             </div>

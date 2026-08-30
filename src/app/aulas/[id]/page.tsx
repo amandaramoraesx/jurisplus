@@ -46,6 +46,12 @@ export default async function AulaDetailPage({
         <h1 className="text-2xl font-bold mt-1">{aula.tema}</h1>
       </div>
 
+      {temConteudo && (
+        <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary self-start">
+          🖨️ Gerar PDF
+        </Link>
+      )}
+
       <section className="card">
         {!temConteudo ? (
           <p className="text-sm text-foreground/60">
@@ -78,9 +84,6 @@ export default async function AulaDetailPage({
                   <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
                 </div>
               )}
-              <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary self-start">
-                🖨️ Ver resumo e gerar PDF
-              </Link>
             </div>
           </details>
         )}

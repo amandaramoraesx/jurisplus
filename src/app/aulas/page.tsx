@@ -108,12 +108,15 @@ export default async function AcademicoPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Acadêmico</h1>
+      <h1 className="text-2xl font-bold">🎓 Acadêmico</h1>
 
       {/* ---------- Aulas e disciplinas ---------- */}
       <details className="disclosure card" id="disciplinas" open={abrir === "disciplinas"}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">📝 Aulas e disciplinas</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
+            Aulas e disciplinas
+          </h2>
           <span className="text-xs text-foreground/50 shrink-0">{disciplinas.length} disciplina(s)</span>
         </summary>
 
@@ -281,7 +284,10 @@ export default async function AcademicoPage({
       {/* ---------- Professores ---------- */}
       <details className="disclosure card" id="professores" open={abrir === "professores"}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">🎓 Professores</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-amber-500/10 text-amber-700 dark:text-amber-400">🎓</span>
+            Professores
+          </h2>
           <span className="text-xs text-foreground/50 shrink-0">{professores.length} professor(es)</span>
         </summary>
 
@@ -364,7 +370,10 @@ export default async function AcademicoPage({
       {/* ---------- Provas ---------- */}
       <details className="disclosure card" id="provas" open={abrir === "provas"}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">📅 Provas</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-red-600/10 text-red-700 dark:text-red-400">📅</span>
+            Provas
+          </h2>
           <span className="text-xs text-foreground/50 shrink-0">{provas.length} marcada(s)</span>
         </summary>
 
@@ -521,7 +530,10 @@ export default async function AcademicoPage({
       {/* ---------- Notas ---------- */}
       <details className="disclosure card" id="notas" open={abrir === "notas"}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">📊 Notas</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-purple-600/10 text-purple-700 dark:text-purple-400">📊</span>
+            Notas
+          </h2>
           <span className="text-xs text-foreground/50 shrink-0">{disciplinasComNotas.length} disciplina(s)</span>
         </summary>
 

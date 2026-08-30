@@ -33,7 +33,7 @@ export default async function GruposPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Trabalhos em grupo</h1>
+      <h1 className="text-2xl font-bold">👥 Trabalhos em grupo</h1>
 
       <details className="disclosure card">
         <summary className="font-semibold text-sm text-foreground/70">Novo trabalho</summary>
@@ -99,7 +99,7 @@ export default async function GruposPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-semibold">{grupo.tema}</p>
+                <p className="font-semibold">📋 {grupo.tema}</p>
                 <p className="text-xs text-foreground/60">
                   {formatDate(grupo.data)}
                   {grupo.disciplina ? ` · ${grupo.disciplina.nome}` : ""}
@@ -119,9 +119,9 @@ export default async function GruposPage() {
               {grupo.integrantes.map((integrante) => (
                 <span
                   key={integrante.id}
-                  className="flex items-center gap-1 text-xs rounded-full border border-black/15 dark:border-white/15 pl-3 pr-1 py-1"
+                  className="flex items-center gap-1 text-xs rounded-full bg-teal-600/10 text-teal-700 dark:text-teal-400 pl-3 pr-1 py-1"
                 >
-                  {integrante.nome}
+                  🙋 {integrante.nome}
                   <form action={removeIntegrante.bind(null, grupo.id, integrante.id)}>
                     <button
                       type="submit"

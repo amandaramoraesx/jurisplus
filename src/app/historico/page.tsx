@@ -48,7 +48,7 @@ export default async function HistoricoPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">Histórico de anotações</h1>
+        <h1 className="text-2xl font-bold">🗓️ Histórico de anotações</h1>
         <p className="text-sm text-foreground/60 mt-1">
           Busque as anotações e lousas já registradas por data ou por professor.
         </p>
@@ -56,7 +56,10 @@ export default async function HistoricoPage({
 
       <details className="disclosure card" open={Boolean(dataSelecionada)}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">🗓️ Por data</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">🗓️</span>
+            Por data
+          </h2>
         </summary>
         <div className="flex flex-col gap-4 mt-4">
           <form method="GET" className="flex flex-col sm:flex-row gap-2">
@@ -104,7 +107,10 @@ export default async function HistoricoPage({
 
       <details className="disclosure card" open={Boolean(professorIdSelecionado)}>
         <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">🎓 Por professor</h2>
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-amber-500/10 text-amber-700 dark:text-amber-400">🎓</span>
+            Por professor
+          </h2>
         </summary>
         <div className="flex flex-col gap-4 mt-4">
           {professores.length === 0 ? (

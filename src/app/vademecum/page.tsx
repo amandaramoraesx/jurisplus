@@ -45,7 +45,7 @@ export default async function VadeMecumPage({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-bold">Vade Mecum digital</h1>
+        <h1 className="text-2xl font-bold">⚖️ Vade Mecum digital</h1>
         <p className="text-sm text-foreground/60 mt-1">
           Busque por código, número ou palavras do texto — CF, Código Civil, Código Penal e CPC já vêm
           carregados direto do texto oficial (planalto.gov.br). Não achou uma lei específica? Cadastre
@@ -145,7 +145,10 @@ export default async function VadeMecumPage({
       )}
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-semibold px-1">Favoritos</h2>
+        <h2 className="font-semibold px-1 flex items-center gap-2">
+          <span className="icon-badge bg-pink-600/10 text-pink-700 dark:text-pink-400">⭐</span>
+          Favoritos
+        </h2>
         {favoritos.length === 0 && (
           <p className="text-sm text-foreground/60">
             Nenhum artigo favoritado ainda. Busque acima e favorite os que mais usar.

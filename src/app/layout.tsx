@@ -52,11 +52,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <ServiceWorkerRegister />
         <NavBar isAdmin={user?.role === "admin"} loggedIn={!!user} />
         <div className="flex-1 min-w-0">
-          <header className="md:hidden flex items-center justify-center gap-2 h-14 border-b border-black/10 dark:border-white/10">
-            <span className="text-lg">⚖️</span>
-            <span className="text-lg font-bold tracking-tight">Juris+</span>
-          </header>
-          <main className="px-4 py-6 pb-24 md:pb-6 max-w-3xl mx-auto w-full">
+          <main
+            className={`px-4 pb-6 md:py-6 max-w-3xl mx-auto w-full ${user ? "pt-20 md:pt-6" : "pt-6"}`}
+          >
             {children}
           </main>
         </div>

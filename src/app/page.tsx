@@ -72,7 +72,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-bold">Início</h1>
+        <h1 className="text-2xl font-bold">👋 Início</h1>
         <p className="text-sm text-foreground/60">
           {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(hoje)}
         </p>
@@ -81,29 +81,35 @@ export default async function DashboardPage() {
       <section className="card flex flex-col gap-3">
         {disciplinas.length === 0 ? (
           <div>
-            <h2 className="font-semibold">Check-in de hoje</h2>
+            <h2 className="font-semibold flex items-center gap-2">
+              <span className="icon-badge bg-green-600/10 text-green-700 dark:text-green-400">✅</span>
+              Check-in de hoje
+            </h2>
             <p className="text-sm text-foreground/60 mt-2">
-              Cadastre suas disciplinas na aba Aulas para começar a fazer check-in.
+              Cadastre suas disciplinas na aba Acadêmico para começar a fazer check-in.
             </p>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="font-semibold">Check-in de hoje</h2>
+                <h2 className="font-semibold flex items-center gap-2">
+                  <span className="icon-badge bg-green-600/10 text-green-700 dark:text-green-400">✅</span>
+                  Check-in de hoje
+                </h2>
                 <p className="text-xs text-foreground/60 mt-0.5">
                   {checkinsFeitos} de {disciplinas.length} disciplina(s) já registrada(s)
                 </p>
               </div>
               <form action={marcarTodasPresentes}>
-                <SubmitButton savedLabel="Check-in feito!" pendingLabel="Marcando...">
-                  Fazer check-in
+                <SubmitButton savedLabel="✅ Check-in feito!" pendingLabel="Marcando...">
+                  🎯 Fazer check-in
                 </SubmitButton>
               </form>
             </div>
 
             <details className="disclosure">
-              <summary className="btn-ghost inline-block">Corrigir uma disciplina específica</summary>
+              <summary className="btn-ghost inline-block">✏️ Corrigir uma disciplina específica</summary>
               <div className="flex flex-col gap-2 mt-3">
                 {disciplinas.map((disciplina) => {
                   const status = presencaHojeMap.get(disciplina.id);
@@ -153,7 +159,10 @@ export default async function DashboardPage() {
       {disciplinas.length > 0 && (
         <section className="card flex flex-col gap-3">
           <div>
-            <h2 className="font-semibold">Anotar aula</h2>
+            <h2 className="font-semibold flex items-center gap-2">
+              <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
+              Anotar aula
+            </h2>
             <p className="text-xs text-foreground/60 mt-0.5">
               Clique na matéria e escreva — fica salvo direto na aula de hoje.
             </p>
@@ -169,8 +178,8 @@ export default async function DashboardPage() {
                     ) : null}
                   </span>
                   {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
-                    <span className="text-[10px] rounded-full px-2 py-0.5 bg-[var(--accent-soft)] text-[var(--accent)] shrink-0">
-                      já tem anotação hoje
+                    <span className="text-[10px] rounded-full px-2 py-0.5 bg-green-600/10 text-green-700 dark:text-green-400 shrink-0">
+                      ✅ já tem anotação hoje
                     </span>
                   )}
                 </summary>
@@ -199,15 +208,15 @@ export default async function DashboardPage() {
                     />
                   </label>
                   <div className="flex items-center gap-3">
-                    <SubmitButton savedLabel="Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
-                      Salvar anotação
+                    <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
+                      💾 Salvar anotação
                     </SubmitButton>
                     {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
                       <Link
                         href={`/aulas/${disciplina.id}_${hojeKey}`}
                         className="text-xs text-foreground/60 hover:underline"
                       >
-                        Ver aula e gerar PDF →
+                        🖨️ Ver aula e gerar PDF →
                       </Link>
                     )}
                   </div>
@@ -222,7 +231,10 @@ export default async function DashboardPage() {
         <section className="card">
           <details className="disclosure">
             <summary className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Frequência por disciplina</h2>
+              <h2 className="font-semibold flex items-center gap-2">
+                <span className="icon-badge bg-purple-600/10 text-purple-700 dark:text-purple-400">📊</span>
+                Frequência por disciplina
+              </h2>
               <span className="btn-ghost shrink-0">Ver</span>
             </summary>
             <div className="overflow-x-auto mt-4">
