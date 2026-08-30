@@ -103,6 +103,7 @@ export async function createAula(disciplinaId: string, formData: FormData) {
   });
 
   revalidatePath("/aulas");
+  revalidatePath("/historico");
 }
 
 export async function updateAula(aulaId: string, formData: FormData) {
@@ -121,6 +122,7 @@ export async function updateAula(aulaId: string, formData: FormData) {
 
   revalidatePath("/aulas");
   revalidatePath(`/aulas/${aulaId}`);
+  revalidatePath("/historico");
 }
 
 export async function deleteAula(aulaId: string, disciplinaId: string) {
@@ -135,7 +137,7 @@ export async function deleteAula(aulaId: string, disciplinaId: string) {
   await batch.commit();
 
   revalidatePath("/aulas");
-  redirect(`/aulas#${disciplinaId}`);
+  redirect(`/aulas?abrir=disciplinas#${disciplinaId}`);
 }
 
 export async function gerarResumoIA(aulaId: string) {

@@ -37,7 +37,7 @@ export default async function AulaDetailPage({
     <div className="flex flex-col gap-6">
       <div>
         <Link
-          href={`/aulas#${aula.disciplinaId}`}
+          href={`/aulas?abrir=disciplinas#${aula.disciplinaId}`}
           className="text-xs text-foreground/60 hover:underline"
         >
           ← {aula.disciplina.nome}

@@ -69,4 +69,5 @@ export async function anotarRapido(disciplinaId: string, formData: FormData) {
   revalidatePath("/");
   revalidatePath("/aulas");
   revalidatePath(`/aulas/${id}`);
+  revalidatePath("/historico");
 }

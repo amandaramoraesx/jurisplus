@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
         await sendPushNotification(sub, {
           title: "Juris+ · Lembrete de prova",
           body: mensagem,
-          url: "/provas",
+          url: "/aulas?abrir=provas",
         });
         notificacoesEnviadas++;
       } catch (err) {

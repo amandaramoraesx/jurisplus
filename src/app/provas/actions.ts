@@ -18,6 +18,7 @@ export async function createProva(formData: FormData) {
   });
 
   revalidatePath("/provas");
+  revalidatePath("/aulas");
 }
 
 export async function updateProva(id: string, formData: FormData) {
@@ -37,9 +38,11 @@ export async function updateProva(id: string, formData: FormData) {
     });
 
   revalidatePath("/provas");
+  revalidatePath("/aulas");
 }
 
 export async function deleteProva(id: string) {
   await db.collection("provas").doc(id).delete();
   revalidatePath("/provas");
+  revalidatePath("/aulas");
 }

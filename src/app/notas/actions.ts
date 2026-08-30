@@ -18,6 +18,7 @@ export async function addNota(disciplinaId: string, formData: FormData) {
   });
 
   revalidatePath("/notas");
+  revalidatePath("/aulas");
 }
 
 export async function updateNota(id: string, formData: FormData) {
@@ -30,9 +31,11 @@ export async function updateNota(id: string, formData: FormData) {
   await db.collection("notas").doc(id).update({ descricao, valor });
 
   revalidatePath("/notas");
+  revalidatePath("/aulas");
 }
 
 export async function deleteNota(id: string) {
   await db.collection("notas").doc(id).delete();
   revalidatePath("/notas");
+  revalidatePath("/aulas");
 }

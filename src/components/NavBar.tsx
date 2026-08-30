@@ -5,10 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 
 const links = [
   { href: "/", label: "Início", icon: "🏠" },
-  { href: "/aulas", label: "Aulas", icon: "📝" },
-  { href: "/notas", label: "Notas", icon: "📊" },
-  { href: "/professores", label: "Professores", icon: "🎓" },
-  { href: "/provas", label: "Provas", icon: "📅" },
+  { href: "/aulas", label: "Acadêmico", icon: "🎓" },
+  { href: "/historico", label: "Histórico", icon: "🗓️" },
   { href: "/palestras", label: "Palestras", icon: "🎤" },
   { href: "/grupos", label: "Grupos", icon: "👥" },
   { href: "/vademecum", label: "Vade Mecum", icon: "⚖️" },
