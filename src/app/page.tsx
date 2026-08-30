@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase-admin";
-import { dateOnlyKey, fromDoc, type Disciplina, type Presenca } from "@/lib/firestore";
-import { marcarPresenca } from "./actions";
+import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor } from "@/lib/firestore";
+import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,17 +11,32 @@ function todayDateOnly() {
 
 export default async function DashboardPage() {
   const hoje = todayDateOnly();
+  const hojeKey = dateOnlyKey(hoje);
 
-  const [disciplinasSnap, aulasSnap, presencasSnap] = await Promise.all([
+  const [disciplinasSnap, professoresSnap, aulasSnap, presencasSnap] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
+    db.collection("professores").get(),
     db.collection("aulas").get(),
     db.collection("presencas").get(),
   ]);
+
+  const professoresPorId = new Map(
+    professoresSnap.docs.map((doc) => [doc.id, fromDoc<Professor>(doc)])
+  );
 
   const aulasPorDisciplina = new Map<string, number>();
   for (const doc of aulasSnap.docs) {
     const disciplinaId = doc.data().disciplinaId as string;
     aulasPorDisciplina.set(disciplinaId, (aulasPorDisciplina.get(disciplinaId) || 0) + 1);
+  }
+
+  // aula "de hoje" de cada disciplina, gravada com id determinístico pela anotação rápida
+  const anotacaoHojePorDisciplina = new Map<string, string>();
+  for (const doc of aulasSnap.docs) {
+    const disciplinaId = doc.data().disciplinaId as string;
+    if (doc.id === `${disciplinaId}_${hojeKey}`) {
+      anotacaoHojePorDisciplina.set(disciplinaId, (doc.data().anotacoesLousa as string) || "");
+    }
   }
 
   const presencas = presencasSnap.docs.map((doc) => fromDoc<Presenca>(doc));
@@ -37,12 +52,13 @@ export default async function DashboardPage() {
     const disciplina = fromDoc<Disciplina>(doc);
     return {
       ...disciplina,
+      professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
       totalAulas: aulasPorDisciplina.get(disciplina.id) || 0,
       presencas: presencasPorDisciplina.get(disciplina.id) || [],
+      anotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || "",
     };
   });
 
-  const hojeKey = dateOnlyKey(hoje);
   const presencaHojeMap = new Map(
     presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])
   );
@@ -57,7 +73,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="card">
+      <section className="card flex flex-col gap-3">
         {disciplinas.length === 0 ? (
           <div>
             <h2 className="font-semibold">Check-in de hoje</h2>
@@ -66,58 +82,111 @@ export default async function DashboardPage() {
             </p>
           </div>
         ) : (
-          <details className="disclosure">
-            <summary className="flex items-center justify-between gap-3">
+          <>
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Check-in de hoje</h2>
                 <p className="text-xs text-foreground/60 mt-0.5">
                   {checkinsFeitos} de {disciplinas.length} disciplina(s) já registrada(s)
                 </p>
               </div>
-              <span className="btn-ghost shrink-0">Abrir</span>
-            </summary>
-            <div className="flex flex-col gap-2 mt-4">
-              {disciplinas.map((disciplina) => {
-                const status = presencaHojeMap.get(disciplina.id);
-                return (
-                  <div
-                    key={disciplina.id}
-                    className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
-                  >
-                    <span className="text-sm font-medium">{disciplina.nome}</span>
-                    <div className="flex gap-2">
-                      <form action={marcarPresenca.bind(null, disciplina.id, true)}>
-                        <button
-                          type="submit"
-                          className={`text-xs rounded-full px-3 py-1 border ${
-                            status === true
-                              ? "bg-green-600 text-white border-green-600"
-                              : "border-black/15 dark:border-white/20 text-foreground/70"
-                          }`}
-                        >
-                          Presente
-                        </button>
-                      </form>
-                      <form action={marcarPresenca.bind(null, disciplina.id, false)}>
-                        <button
-                          type="submit"
-                          className={`text-xs rounded-full px-3 py-1 border ${
-                            status === false
-                              ? "bg-red-600 text-white border-red-600"
-                              : "border-black/15 dark:border-white/20 text-foreground/70"
-                          }`}
-                        >
-                          Faltei
-                        </button>
-                      </form>
-                    </div>
-                  </div>
-                );
-              })}
+              <form action={marcarTodasPresentes}>
+                <button type="submit" className="btn-primary shrink-0">
+                  Fazer check-in
+                </button>
+              </form>
             </div>
-          </details>
+
+            <details className="disclosure">
+              <summary className="btn-ghost inline-block">Corrigir uma disciplina específica</summary>
+              <div className="flex flex-col gap-2 mt-3">
+                {disciplinas.map((disciplina) => {
+                  const status = presencaHojeMap.get(disciplina.id);
+                  return (
+                    <div
+                      key={disciplina.id}
+                      className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
+                    >
+                      <span className="text-sm font-medium">{disciplina.nome}</span>
+                      <div className="flex gap-2">
+                        <form action={marcarPresenca.bind(null, disciplina.id, true)}>
+                          <button
+                            type="submit"
+                            className={`text-xs rounded-full px-3 py-1 border ${
+                              status === true
+                                ? "bg-green-600 text-white border-green-600"
+                                : "border-black/15 dark:border-white/20 text-foreground/70"
+                            }`}
+                          >
+                            Presente
+                          </button>
+                        </form>
+                        <form action={marcarPresenca.bind(null, disciplina.id, false)}>
+                          <button
+                            type="submit"
+                            className={`text-xs rounded-full px-3 py-1 border ${
+                              status === false
+                                ? "bg-red-600 text-white border-red-600"
+                                : "border-black/15 dark:border-white/20 text-foreground/70"
+                            }`}
+                          >
+                            Faltei
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          </>
         )}
       </section>
+
+      {disciplinas.length > 0 && (
+        <section className="card flex flex-col gap-3">
+          <div>
+            <h2 className="font-semibold">Anotar aula</h2>
+            <p className="text-xs text-foreground/60 mt-0.5">
+              Clique na matéria e escreva — fica salvo direto na aula de hoje.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {disciplinas.map((disciplina) => (
+              <details key={disciplina.id} className="disclosure">
+                <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
+                  <span>
+                    {disciplina.nome}
+                    {disciplina.professor ? (
+                      <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
+                    ) : null}
+                  </span>
+                  {disciplina.anotacaoHoje && (
+                    <span className="text-[10px] rounded-full px-2 py-0.5 bg-[var(--accent-soft)] text-[var(--accent)] shrink-0">
+                      já tem anotação hoje
+                    </span>
+                  )}
+                </summary>
+                <form
+                  action={anotarRapido.bind(null, disciplina.id)}
+                  className="flex flex-col gap-2 mt-2"
+                >
+                  <textarea
+                    name="anotacoesLousa"
+                    defaultValue={disciplina.anotacaoHoje}
+                    rows={5}
+                    placeholder="Anote aqui o que o professor está explicando..."
+                    className="field"
+                  />
+                  <button type="submit" className="self-start btn-primary">
+                    Salvar anotação
+                  </button>
+                </form>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
 
       {disciplinas.length > 0 && (
         <section className="card">
