@@ -151,3 +151,21 @@ body {
 .disclosure summary::-webkit-details-marker {
   display: none;
 }
+
+@media print {
+  aside,
+  nav,
+  header {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+}

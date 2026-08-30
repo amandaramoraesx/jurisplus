@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
 import { updateAula, deleteAula, gerarResumoIA } from "../actions";
 import { isIAConfigured } from "@/lib/anthropic";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -65,17 +66,17 @@ export default async function AulaDetailPage({
           />
         </label>
         <label className="text-xs font-medium text-foreground/60">
-          Resumo da aula
+          Anotações
           <textarea
             name="resumo"
             defaultValue={aula.resumo ?? ""}
             rows={6}
-            placeholder="Escreva aqui o resumo do que foi explicado na aula..."
+            placeholder="Escreva aqui suas anotações sobre a aula..."
             className="mt-1 w-full field"
           />
         </label>
         <label className="text-xs font-medium text-foreground/60">
-          Anotações da lousa
+          Lousa
           <textarea
             name="anotacoesLousa"
             defaultValue={aula.anotacoesLousa ?? ""}
@@ -85,14 +86,18 @@ export default async function AulaDetailPage({
           />
         </label>
         <div className="flex gap-3">
-          <button
-            type="submit"
-            className="btn-primary"
-          >
-            Salvar
-          </button>
+          <SubmitButton>Salvar</SubmitButton>
         </div>
       </form>
+
+      {(aula.resumo || aula.anotacoesLousa || aula.resumoIA) && (
+        <Link
+          href={`/aulas/${aula.id}/imprimir`}
+          className="btn-ghost self-start"
+        >
+          🖨️ Ver resumo e gerar PDF
+        </Link>
+      )}
 
       <div className="card flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -119,7 +124,7 @@ export default async function AulaDetailPage({
           <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
         ) : (
           <p className="text-xs text-foreground/50">
-            Preencha o resumo ou as anotações da lousa e clique em &ldquo;Gerar
+            Preencha as anotações ou a lousa e clique em &ldquo;Gerar
             resumo&rdquo; para ter uma síntese pronta para revisão.
           </p>
         )}

@@ -1,6 +1,7 @@
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor } from "@/lib/firestore";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +32,14 @@ export default async function DashboardPage() {
   }
 
   // aula "de hoje" de cada disciplina, gravada com id determinístico pela anotação rápida
-  const anotacaoHojePorDisciplina = new Map<string, string>();
+  const anotacaoHojePorDisciplina = new Map<string, { resumo: string; anotacoesLousa: string }>();
   for (const doc of aulasSnap.docs) {
     const disciplinaId = doc.data().disciplinaId as string;
     if (doc.id === `${disciplinaId}_${hojeKey}`) {
-      anotacaoHojePorDisciplina.set(disciplinaId, (doc.data().anotacoesLousa as string) || "");
+      anotacaoHojePorDisciplina.set(disciplinaId, {
+        resumo: (doc.data().resumo as string) || "",
+        anotacoesLousa: (doc.data().anotacoesLousa as string) || "",
+      });
     }
   }
 
@@ -55,7 +59,7 @@ export default async function DashboardPage() {
       professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
       totalAulas: aulasPorDisciplina.get(disciplina.id) || 0,
       presencas: presencasPorDisciplina.get(disciplina.id) || [],
-      anotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || "",
+      anotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || { resumo: "", anotacoesLousa: "" },
     };
   });
 
@@ -91,9 +95,9 @@ export default async function DashboardPage() {
                 </p>
               </div>
               <form action={marcarTodasPresentes}>
-                <button type="submit" className="btn-primary shrink-0">
+                <SubmitButton savedLabel="Check-in feito!" pendingLabel="Marcando...">
                   Fazer check-in
-                </button>
+                </SubmitButton>
               </form>
             </div>
 
@@ -110,8 +114,9 @@ export default async function DashboardPage() {
                       <span className="text-sm font-medium">{disciplina.nome}</span>
                       <div className="flex gap-2">
                         <form action={marcarPresenca.bind(null, disciplina.id, true)}>
-                          <button
-                            type="submit"
+                          <SubmitButton
+                            pendingLabel="..."
+                            savedLabel="Presente"
                             className={`text-xs rounded-full px-3 py-1 border ${
                               status === true
                                 ? "bg-green-600 text-white border-green-600"
@@ -119,11 +124,12 @@ export default async function DashboardPage() {
                             }`}
                           >
                             Presente
-                          </button>
+                          </SubmitButton>
                         </form>
                         <form action={marcarPresenca.bind(null, disciplina.id, false)}>
-                          <button
-                            type="submit"
+                          <SubmitButton
+                            pendingLabel="..."
+                            savedLabel="Faltei"
                             className={`text-xs rounded-full px-3 py-1 border ${
                               status === false
                                 ? "bg-red-600 text-white border-red-600"
@@ -131,7 +137,7 @@ export default async function DashboardPage() {
                             }`}
                           >
                             Faltei
-                          </button>
+                          </SubmitButton>
                         </form>
                       </div>
                     </div>
@@ -161,7 +167,7 @@ export default async function DashboardPage() {
                       <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
                     ) : null}
                   </span>
-                  {disciplina.anotacaoHoje && (
+                  {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
                     <span className="text-[10px] rounded-full px-2 py-0.5 bg-[var(--accent-soft)] text-[var(--accent)] shrink-0">
                       já tem anotação hoje
                     </span>
@@ -169,18 +175,31 @@ export default async function DashboardPage() {
                 </summary>
                 <form
                   action={anotarRapido.bind(null, disciplina.id)}
-                  className="flex flex-col gap-2 mt-2"
+                  className="flex flex-col gap-3 mt-2"
                 >
-                  <textarea
-                    name="anotacoesLousa"
-                    defaultValue={disciplina.anotacaoHoje}
-                    rows={5}
-                    placeholder="Anote aqui o que o professor está explicando..."
-                    className="field"
-                  />
-                  <button type="submit" className="self-start btn-primary">
+                  <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
+                    Anotações
+                    <textarea
+                      name="resumo"
+                      defaultValue={disciplina.anotacaoHoje.resumo}
+                      rows={4}
+                      placeholder="Suas anotações sobre a aula..."
+                      className="field"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
+                    Lousa
+                    <textarea
+                      name="anotacoesLousa"
+                      defaultValue={disciplina.anotacaoHoje.anotacoesLousa}
+                      rows={4}
+                      placeholder="O que o professor escreveu na lousa..."
+                      className="field font-mono"
+                    />
+                  </label>
+                  <SubmitButton savedLabel="Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
                     Salvar anotação
-                  </button>
+                  </SubmitButton>
                 </form>
               </details>
             ))}

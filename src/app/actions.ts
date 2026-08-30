@@ -43,8 +43,9 @@ export async function marcarTodasPresentes() {
 }
 
 export async function anotarRapido(disciplinaId: string, formData: FormData) {
+  const resumo = String(formData.get("resumo") || "").trim();
   const anotacoesLousa = String(formData.get("anotacoesLousa") || "").trim();
-  if (!anotacoesLousa) return;
+  if (!resumo && !anotacoesLousa) return;
 
   const hoje = todayDateOnly();
   const id = `${disciplinaId}_${dateOnlyKey(hoje)}`;
@@ -52,14 +53,14 @@ export async function anotarRapido(disciplinaId: string, formData: FormData) {
   const doc = await ref.get();
 
   if (doc.exists) {
-    await ref.update({ anotacoesLousa });
+    await ref.update({ resumo: resumo || null, anotacoesLousa: anotacoesLousa || null });
   } else {
     await ref.set({
       disciplinaId,
       data: hoje,
       tema: `Aula de ${new Intl.DateTimeFormat("pt-BR").format(hoje)}`,
-      resumo: null,
-      anotacoesLousa,
+      resumo: resumo || null,
+      anotacoesLousa: anotacoesLousa || null,
       resumoIA: null,
       createdAt: new Date(),
     });
