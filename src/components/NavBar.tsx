@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const links = [
   { href: "/", label: "Início", icon: "🏠" },
@@ -19,8 +19,17 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-export function NavBar() {
+export function NavBar({ isAdmin, loggedIn }: { isAdmin: boolean; loggedIn: boolean }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  if (!loggedIn) return null;
+
+  async function sair() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   return (
     <>
@@ -30,7 +39,7 @@ export function NavBar() {
           <span className="text-xl">⚖️</span>
           <span className="text-xl font-bold tracking-tight">Juris+</span>
         </div>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-1 flex-1">
           {links.map((link) => (
             <Link
               key={link.href}
@@ -45,7 +54,27 @@ export function NavBar() {
               {link.label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link
+              href="/admin/usuarios"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                isActive(pathname, "/admin")
+                  ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "text-foreground/70 hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+              }`}
+            >
+              <span aria-hidden>🔑</span>
+              Usuários
+            </Link>
+          )}
         </nav>
+        <button
+          onClick={sair}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/50 hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+        >
+          <span aria-hidden>🚪</span>
+          Sair
+        </button>
       </aside>
 
       {/* Barra inferior para celular */}
@@ -67,6 +96,30 @@ export function NavBar() {
               {link.label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link
+              href="/admin/usuarios"
+              className={`flex flex-1 min-w-[64px] flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-medium transition-colors ${
+                isActive(pathname, "/admin")
+                  ? "text-[var(--accent)]"
+                  : "text-foreground/50"
+              }`}
+            >
+              <span className="text-lg" aria-hidden>
+                🔑
+              </span>
+              Usuários
+            </Link>
+          )}
+          <button
+            onClick={sair}
+            className="flex flex-1 min-w-[64px] flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-medium text-foreground/50"
+          >
+            <span className="text-lg" aria-hidden>
+              🚪
+            </span>
+            Sair
+          </button>
         </div>
       </nav>
     </>

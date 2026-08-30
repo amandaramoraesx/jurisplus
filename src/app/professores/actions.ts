@@ -1,9 +1,12 @@
 "use server";
 
 import { db } from "@/lib/firebase-admin";
+import { requireAdmin } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function createProfessor(formData: FormData) {
+  await requireAdmin();
+
   const nome = String(formData.get("nome") || "").trim();
   const email = String(formData.get("email") || "").trim();
   const telefone = String(formData.get("telefone") || "").trim();
@@ -22,6 +25,8 @@ export async function createProfessor(formData: FormData) {
 }
 
 export async function updateProfessor(id: string, formData: FormData) {
+  await requireAdmin();
+
   const nome = String(formData.get("nome") || "").trim();
   const email = String(formData.get("email") || "").trim();
   const telefone = String(formData.get("telefone") || "").trim();
@@ -42,6 +47,8 @@ export async function updateProfessor(id: string, formData: FormData) {
 }
 
 export async function deleteProfessor(id: string) {
+  await requireAdmin();
+
   const disciplinasSnap = await db
     .collection("disciplinas")
     .where("professorId", "==", id)

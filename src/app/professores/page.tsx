@@ -1,10 +1,14 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Professor, type Disciplina } from "@/lib/firestore";
 import { createProfessor, updateProfessor, deleteProfessor } from "./actions";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfessoresPage() {
+  const user = await requireUser();
+  const isAdmin = user.role === "admin";
+
   const [professoresSnap, disciplinasSnap] = await Promise.all([
     db.collection("professores").orderBy("nome", "asc").get(),
     db.collection("disciplinas").get(),
@@ -31,37 +35,39 @@ export default async function ProfessoresPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold">Professores</h1>
 
-      <form
-        action={createProfessor}
-        className="flex flex-col gap-3 card"
-      >
-        <h2 className="font-semibold text-sm text-foreground/70">Novo professor</h2>
-        <input
-          name="nome"
-          placeholder="Nome"
-          required
-          className="field"
-        />
-        <div className="flex gap-3">
-          <input
-            name="email"
-            type="email"
-            placeholder="E-mail (opcional)"
-            className="flex-1 field"
-          />
-          <input
-            name="telefone"
-            placeholder="Telefone (opcional)"
-            className="flex-1 field"
-          />
-        </div>
-        <button
-          type="submit"
-          className="self-start btn-primary"
+      {isAdmin && (
+        <form
+          action={createProfessor}
+          className="flex flex-col gap-3 card"
         >
-          Adicionar
-        </button>
-      </form>
+          <h2 className="font-semibold text-sm text-foreground/70">Novo professor</h2>
+          <input
+            name="nome"
+            placeholder="Nome"
+            required
+            className="field"
+          />
+          <div className="flex gap-3">
+            <input
+              name="email"
+              type="email"
+              placeholder="E-mail (opcional)"
+              className="flex-1 field"
+            />
+            <input
+              name="telefone"
+              placeholder="Telefone (opcional)"
+              className="flex-1 field"
+            />
+          </div>
+          <button
+            type="submit"
+            className="self-start btn-primary"
+          >
+            Adicionar
+          </button>
+        </form>
+      )}
 
       <div className="flex flex-col gap-2">
         {professores.length === 0 && (
@@ -81,53 +87,57 @@ export default async function ProfessoresPage() {
                   {professor.telefone ? ` · ${professor.telefone}` : ""}
                 </p>
               </div>
-              <form action={deleteProfessor.bind(null, professor.id)}>
-                <button
-                  type="submit"
-                  className="btn-danger-text shrink-0"
-                >
-                  Remover
-                </button>
-              </form>
+              {isAdmin && (
+                <form action={deleteProfessor.bind(null, professor.id)}>
+                  <button
+                    type="submit"
+                    className="btn-danger-text shrink-0"
+                  >
+                    Remover
+                  </button>
+                </form>
+              )}
             </div>
 
-            <details className="disclosure text-sm">
-              <summary className="text-foreground/70 font-medium">
-                Editar
-              </summary>
-              <form
-                action={updateProfessor.bind(null, professor.id)}
-                className="flex flex-col gap-2 mt-3"
-              >
-                <input
-                  name="nome"
-                  defaultValue={professor.nome}
-                  required
-                  className="field"
-                />
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    name="email"
-                    type="email"
-                    defaultValue={professor.email ?? ""}
-                    placeholder="E-mail (opcional)"
-                    className="flex-1 field"
-                  />
-                  <input
-                    name="telefone"
-                    defaultValue={professor.telefone ?? ""}
-                    placeholder="Telefone (opcional)"
-                    className="flex-1 field"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="self-start btn-primary"
+            {isAdmin && (
+              <details className="disclosure text-sm">
+                <summary className="text-foreground/70 font-medium">
+                  Editar
+                </summary>
+                <form
+                  action={updateProfessor.bind(null, professor.id)}
+                  className="flex flex-col gap-2 mt-3"
                 >
-                  Salvar alterações
-                </button>
-              </form>
-            </details>
+                  <input
+                    name="nome"
+                    defaultValue={professor.nome}
+                    required
+                    className="field"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      name="email"
+                      type="email"
+                      defaultValue={professor.email ?? ""}
+                      placeholder="E-mail (opcional)"
+                      className="flex-1 field"
+                    />
+                    <input
+                      name="telefone"
+                      defaultValue={professor.telefone ?? ""}
+                      placeholder="Telefone (opcional)"
+                      className="flex-1 field"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="self-start btn-primary"
+                  >
+                    Salvar alterações
+                  </button>
+                </form>
+              </details>
+            )}
           </div>
         ))}
       </div>

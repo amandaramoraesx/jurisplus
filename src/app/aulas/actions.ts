@@ -4,8 +4,11 @@ import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAnthropicClient } from "@/lib/anthropic";
+import { requireAdmin } from "@/lib/auth";
 
 export async function createDisciplina(formData: FormData) {
+  await requireAdmin();
+
   const nome = String(formData.get("nome") || "").trim();
   const semestre = String(formData.get("semestre") || "").trim();
   const professorId = String(formData.get("professorId") || "").trim();
@@ -23,6 +26,8 @@ export async function createDisciplina(formData: FormData) {
 }
 
 export async function updateDisciplina(id: string, formData: FormData) {
+  await requireAdmin();
+
   const nome = String(formData.get("nome") || "").trim();
   const semestre = String(formData.get("semestre") || "").trim();
   const professorId = String(formData.get("professorId") || "").trim();
@@ -48,6 +53,8 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 export async function deleteDisciplina(id: string) {
+  await requireAdmin();
+
   const [aulasSnap, presencasSnap, notasSnap, provasSnap, gruposSnap] = await Promise.all([
     db.collection("aulas").where("disciplinaId", "==", id).get(),
     db.collection("presencas").where("disciplinaId", "==", id).get(),

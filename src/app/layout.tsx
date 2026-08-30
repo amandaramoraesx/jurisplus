@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { getCurrentUser } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,7 +40,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const user = await getCurrentUser();
+
   return (
     <html
       lang="pt-BR"
@@ -47,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col md:flex-row">
         <ServiceWorkerRegister />
-        <NavBar />
+        <NavBar isAdmin={user?.role === "admin"} loggedIn={!!user} />
         <div className="flex-1 min-w-0">
           <header className="md:hidden flex items-center justify-center gap-2 h-14 border-b border-black/10 dark:border-white/10">
             <span className="text-lg">⚖️</span>

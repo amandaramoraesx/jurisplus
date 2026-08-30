@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Disciplina, type Professor, type Aula } from "@/lib/firestore";
 import { createDisciplina, updateDisciplina, deleteDisciplina, createAula } from "./actions";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ function formatDate(d: Date) {
 }
 
 export default async function AulasPage() {
+  const user = await requireUser();
+  const isAdmin = user.role === "admin";
+
   const [disciplinasSnap, professoresSnap, aulasSnap] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").orderBy("nome", "asc").get(),
@@ -40,44 +44,46 @@ export default async function AulasPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-bold">Aulas</h1>
 
-      <form
-        action={createDisciplina}
-        className="flex flex-col gap-3 card"
-      >
-        <h2 className="font-semibold text-sm text-foreground/70">Nova disciplina</h2>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <input
-            name="nome"
-            placeholder="Nome da disciplina"
-            required
-            className="flex-1 field"
-          />
-          <input
-            name="semestre"
-            placeholder="Semestre (ex: 2026.2)"
-            required
-            className="w-40 field"
-          />
-        </div>
-        <select
-          name="professorId"
-          className="field"
-          defaultValue=""
+      {isAdmin && (
+        <form
+          action={createDisciplina}
+          className="flex flex-col gap-3 card"
         >
-          <option value="">Sem professor vinculado</option>
-          {professores.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nome}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="self-start btn-primary"
-        >
-          Criar disciplina
-        </button>
-      </form>
+          <h2 className="font-semibold text-sm text-foreground/70">Nova disciplina</h2>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              name="nome"
+              placeholder="Nome da disciplina"
+              required
+              className="flex-1 field"
+            />
+            <input
+              name="semestre"
+              placeholder="Semestre (ex: 2026.2)"
+              required
+              className="w-40 field"
+            />
+          </div>
+          <select
+            name="professorId"
+            className="field"
+            defaultValue=""
+          >
+            <option value="">Sem professor vinculado</option>
+            {professores.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nome}
+              </option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            className="self-start btn-primary"
+          >
+            Criar disciplina
+          </button>
+        </form>
+      )}
 
       <div className="flex flex-col gap-8">
         {disciplinas.length === 0 && (
@@ -100,58 +106,62 @@ export default async function AulasPage() {
                   {disciplina.professor ? ` · ${disciplina.professor.nome}` : ""}
                 </p>
               </div>
-              <form action={deleteDisciplina.bind(null, disciplina.id)}>
-                <button
-                  type="submit"
-                  className="btn-danger-text"
-                >
-                  Remover
-                </button>
-              </form>
+              {isAdmin && (
+                <form action={deleteDisciplina.bind(null, disciplina.id)}>
+                  <button
+                    type="submit"
+                    className="btn-danger-text"
+                  >
+                    Remover
+                  </button>
+                </form>
+              )}
             </div>
 
-            <details className="disclosure text-sm">
-              <summary className="text-foreground/70 font-medium">
-                Editar disciplina
-              </summary>
-              <form
-                action={updateDisciplina.bind(null, disciplina.id)}
-                className="flex flex-col gap-2 mt-3"
-              >
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    name="nome"
-                    defaultValue={disciplina.nome}
-                    required
-                    className="flex-1 field"
-                  />
-                  <input
-                    name="semestre"
-                    defaultValue={disciplina.semestre}
-                    required
-                    className="w-40 field"
-                  />
-                </div>
-                <select
-                  name="professorId"
-                  defaultValue={disciplina.professorId ?? ""}
-                  className="field"
+            {isAdmin && (
+              <details className="disclosure text-sm">
+                <summary className="text-foreground/70 font-medium">
+                  Editar disciplina
+                </summary>
+                <form
+                  action={updateDisciplina.bind(null, disciplina.id)}
+                  className="flex flex-col gap-2 mt-3"
                 >
-                  <option value="">Sem professor vinculado</option>
-                  {professores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nome}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  className="self-start btn-primary"
-                >
-                  Salvar alterações
-                </button>
-              </form>
-            </details>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      name="nome"
+                      defaultValue={disciplina.nome}
+                      required
+                      className="flex-1 field"
+                    />
+                    <input
+                      name="semestre"
+                      defaultValue={disciplina.semestre}
+                      required
+                      className="w-40 field"
+                    />
+                  </div>
+                  <select
+                    name="professorId"
+                    defaultValue={disciplina.professorId ?? ""}
+                    className="field"
+                  >
+                    <option value="">Sem professor vinculado</option>
+                    {professores.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="submit"
+                    className="self-start btn-primary"
+                  >
+                    Salvar alterações
+                  </button>
+                </form>
+              </details>
+            )}
 
             <details className="disclosure text-sm">
               <summary className="text-foreground/70 font-medium">
