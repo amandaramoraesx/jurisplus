@@ -1,10 +1,24 @@
 "use server";
 
-import { db } from "@/lib/firebase-admin";
+import { randomUUID } from "crypto";
+import { db, storage } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
+import type { Anexo } from "@/lib/firestore";
+
+const TIPOS_ANEXO_PERMITIDOS: Record<string, string> = {
+  "application/pdf": "PDF",
+  "image/jpeg": "imagem",
+  "image/png": "imagem",
+  "image/webp": "imagem",
+  "image/gif": "imagem",
+  "application/vnd.ms-powerpoint": "slide",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "slide",
+};
+
+const ANEXO_TAMANHO_MAXIMO = 15 * 1024 * 1024; // 15MB
 
 function parseDiasSemana(formData: FormData): number[] {
   return formData
@@ -155,6 +169,65 @@ export async function deleteAula(aulaId: string, disciplinaId: string) {
 
   revalidatePath("/aulas");
   redirect(`/aulas?abrir=disciplinas#${disciplinaId}`);
+}
+
+export async function adicionarAnexoAula(aulaId: string, formData: FormData) {
+  await requireUser();
+
+  const arquivo = formData.get("arquivo");
+  if (!(arquivo instanceof File) || arquivo.size === 0) {
+    throw new Error("Selecione um arquivo para anexar.");
+  }
+  if (!TIPOS_ANEXO_PERMITIDOS[arquivo.type]) {
+    throw new Error(
+      "Só é possível anexar PDF, imagem (JPG, PNG, WEBP ou GIF) ou slide (PPT ou PPTX)."
+    );
+  }
+  if (arquivo.size > ANEXO_TAMANHO_MAXIMO) {
+    throw new Error("Arquivo muito grande (máximo 15 MB).");
+  }
+
+  const anexoId = randomUUID();
+  const storagePath = `aulas/${aulaId}/${anexoId}-${arquivo.name}`;
+  const buffer = Buffer.from(await arquivo.arrayBuffer());
+
+  await storage.bucket().file(storagePath).save(buffer, {
+    contentType: arquivo.type,
+  });
+
+  const anexo: Anexo = {
+    id: anexoId,
+    nome: arquivo.name,
+    tipo: arquivo.type,
+    tamanho: arquivo.size,
+    storagePath,
+    criadoEm: new Date().toISOString(),
+  };
+
+  const aulaRef = db.collection("aulas").doc(aulaId);
+  const aulaDoc = await aulaRef.get();
+  const anexosAtuais = (aulaDoc.data()?.anexos as Anexo[] | undefined) ?? [];
+  await aulaRef.update({ anexos: [...anexosAtuais, anexo] });
+
+  revalidatePath(`/aulas/${aulaId}`);
+  revalidatePath("/historico");
+}
+
+export async function removerAnexoAula(aulaId: string, anexoId: string, storagePath: string) {
+  await requireUser();
+
+  await storage
+    .bucket()
+    .file(storagePath)
+    .delete({ ignoreNotFound: true });
+
+  const aulaRef = db.collection("aulas").doc(aulaId);
+  const aulaDoc = await aulaRef.get();
+  const anexosAtuais = (aulaDoc.data()?.anexos as Anexo[] | undefined) ?? [];
+  await aulaRef.update({ anexos: anexosAtuais.filter((a) => a.id !== anexoId) });
+
+  revalidatePath(`/aulas/${aulaId}`);
+  revalidatePath("/historico");
 }
 
 export async function gerarResumoIA(aulaId: string) {

@@ -2,10 +2,18 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
-import { updateAula, deleteAula, gerarResumoIA, gerarQuizAula } from "../actions";
+import {
+  updateAula,
+  deleteAula,
+  gerarResumoIA,
+  gerarQuizAula,
+  adicionarAnexoAula,
+  removerAnexoAula,
+} from "../actions";
 import { isIAConfigured } from "@/lib/anthropic";
 import { SubmitButton } from "@/components/SubmitButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
+import { AnexoIcone, formatBytes } from "@/components/Anexo";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +142,58 @@ export default async function AulaDetailPage({
             <SubmitButton>Salvar</SubmitButton>
           </div>
         </form>
+      </details>
+
+      <details className="disclosure card" open={Boolean(aula.anexos?.length)}>
+        <summary className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-sm text-foreground/70">
+            📎 Anexos {aula.anexos?.length ? `(${aula.anexos.length})` : ""}
+          </h2>
+          <span className="btn-ghost shrink-0">Abrir</span>
+        </summary>
+        <div className="flex flex-col gap-3 mt-3">
+          {aula.anexos && aula.anexos.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {aula.anexos.map((anexo) => (
+                <li
+                  key={anexo.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 p-2"
+                >
+                  <a
+                    href={`/api/anexos/${aula.id}/${anexo.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 min-w-0 text-sm hover:underline"
+                  >
+                    <AnexoIcone tipo={anexo.tipo} />
+                    <span className="truncate">{anexo.nome}</span>
+                    <span className="text-xs text-foreground/50 shrink-0">
+                      {formatBytes(anexo.tamanho)}
+                    </span>
+                  </a>
+                  <form action={removerAnexoAula.bind(null, aula.id, anexo.id, anexo.storagePath)}>
+                    <button type="submit" className="text-xs text-foreground/40 hover:text-red-600 shrink-0">
+                      Remover
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={adicionarAnexoAula.bind(null, aula.id)} className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-foreground/60">
+              Anexar PDF, imagem ou slide (opcional)
+              <input
+                name="arquivo"
+                type="file"
+                accept=".pdf,.ppt,.pptx,image/*,application/pdf"
+                required
+                className="mt-1 w-full field"
+              />
+            </label>
+            <SubmitButton className="btn-ghost self-start">Anexar arquivo</SubmitButton>
+          </form>
+        </div>
       </details>
 
       <details className="disclosure card">

@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { getStorage, type Storage } from "firebase-admin/storage";
 
 function buildApp() {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -13,8 +14,14 @@ function buildApp() {
     );
   }
 
+  // Bucket padrão de projetos novos do Firebase; se o bucket real for
+  // diferente (projeto mais antigo), defina FIREBASE_STORAGE_BUCKET no .env
+  // com o nome exato mostrado em Console do Firebase > Storage.
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
+
   return initializeApp({
     credential: cert({ projectId, clientEmail, privateKey }),
+    storageBucket,
   });
 }
 
@@ -41,3 +48,4 @@ function lazyApp<T extends object>(get: (app: ReturnType<typeof getApps>[number]
 
 export const db: Firestore = lazyApp((app) => getFirestore(app));
 export const auth: Auth = lazyApp((app) => getAuth(app));
+export const storage: Storage = lazyApp((app) => getStorage(app));

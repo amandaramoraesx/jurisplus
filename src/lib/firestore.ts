@@ -30,6 +30,16 @@ export type Disciplina = {
   quizIAGeradoEm?: Date | null;
 };
 
+export type Anexo = {
+  id: string;
+  nome: string;
+  tipo: string;
+  tamanho: number;
+  storagePath: string;
+  /** ISO string (não Timestamp) pra evitar conversão de data em item de array. */
+  criadoEm: string;
+};
+
 export type Aula = {
   id: string;
   disciplinaId: string;
@@ -40,6 +50,7 @@ export type Aula = {
   resumoIA: string | null;
   createdAt: Date;
   quizIA?: QuizPergunta[] | null;
+  anexos?: Anexo[];
 };
 
 export type Presenca = {

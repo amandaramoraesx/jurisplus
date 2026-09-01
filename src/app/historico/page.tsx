@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
+import { AnexoIcone, formatBytes } from "@/components/Anexo";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function HistoricoPage({
 
   const aulasComConteudo = aulasSnap.docs
     .map((doc) => fromDoc<Aula>(doc))
-    .filter((aula) => aula.resumo || aula.anotacoesLousa)
+    .filter((aula) => aula.resumo || aula.anotacoesLousa || aula.anexos?.length)
     .map((aula) => {
       const disciplina = disciplinasPorId.get(aula.disciplinaId) ?? null;
       const professor = disciplina?.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null;
@@ -95,6 +96,26 @@ export default async function HistoricoPage({
                   {aula.anotacoesLousa && (
                     <p className="text-sm mt-2 whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
                   )}
+                  {aula.anexos && aula.anexos.length > 0 && (
+                    <ul className="flex flex-col gap-1 mt-2">
+                      {aula.anexos.map((anexo) => (
+                        <li key={anexo.id}>
+                          <a
+                            href={`/api/anexos/${aula.id}/${anexo.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs hover:underline"
+                          >
+                            <AnexoIcone tipo={anexo.tipo} />
+                            <span className="truncate">{anexo.nome}</span>
+                            <span className="text-foreground/50 shrink-0">
+                              ({formatBytes(anexo.tamanho)})
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
                     Ver aula e gerar PDF →
                   </Link>
@@ -156,6 +177,26 @@ export default async function HistoricoPage({
                   {aula.resumo && <p className="text-sm mt-2 whitespace-pre-wrap">{aula.resumo}</p>}
                   {aula.anotacoesLousa && (
                     <p className="text-sm mt-2 whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
+                  )}
+                  {aula.anexos && aula.anexos.length > 0 && (
+                    <ul className="flex flex-col gap-1 mt-2">
+                      {aula.anexos.map((anexo) => (
+                        <li key={anexo.id}>
+                          <a
+                            href={`/api/anexos/${aula.id}/${anexo.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-xs hover:underline"
+                          >
+                            <AnexoIcone tipo={anexo.tipo} />
+                            <span className="truncate">{anexo.nome}</span>
+                            <span className="text-foreground/50 shrink-0">
+                              ({formatBytes(anexo.tamanho)})
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
                     Ver aula e gerar PDF →

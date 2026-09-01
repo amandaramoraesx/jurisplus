@@ -27,3 +27,8 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: juris-plus.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
