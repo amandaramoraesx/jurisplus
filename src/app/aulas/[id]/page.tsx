@@ -14,6 +14,7 @@ import { isIAConfigured } from "@/lib/anthropic";
 import { SubmitButton } from "@/components/SubmitButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
+import { ResumoCards } from "@/components/ResumoCards";
 
 export const dynamic = "force-dynamic";
 
@@ -224,6 +225,23 @@ export default async function AulaDetailPage({
             <p className="text-xs text-foreground/50">
               Preencha as anotações ou a lousa e clique em &ldquo;Gerar
               resumo&rdquo; para ter uma síntese pronta para revisão.
+            </p>
+          )}
+        </div>
+      </details>
+
+      <details className="disclosure card" open={Boolean(aula.resumoIA || aula.resumo)}>
+        <summary className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-sm text-foreground/70">🗂️ Resumo em cards</h2>
+          <span className="btn-ghost shrink-0">Abrir</span>
+        </summary>
+        <div className="mt-3">
+          {aula.resumoIA || aula.resumo ? (
+            <ResumoCards texto={aula.resumoIA || aula.resumo || ""} />
+          ) : (
+            <p className="text-xs text-foreground/50">
+              Preencha as anotações (ou gere o resumo inteligente) para ver aqui um resumo em
+              cards, rápido de revisar antes da prova.
             </p>
           )}
         </div>

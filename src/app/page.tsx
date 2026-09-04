@@ -141,7 +141,6 @@ export default async function DashboardPage() {
   const temHoje = (d: (typeof disciplinas)[number]) =>
     !d.diasSemana || d.diasSemana.length === 0 || d.diasSemana.includes(hojeDiaSemana);
   const disciplinasHoje = disciplinas.filter(temHoje);
-  const disciplinasOutras = disciplinas.filter((d) => !temHoje(d));
 
   const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
 
@@ -184,7 +183,11 @@ export default async function DashboardPage() {
                   Check-in de hoje
                 </h2>
                 <p className="text-xs text-foreground/60 mt-0.5">
-                  {checkinsFeitos} de {disciplinasHoje.length} disciplina(s) já registrada(s)
+                  Hoje é {DIAS_SEMANA[hojeDiaSemana]}, você tem aula de{" "}
+                  <strong className="font-semibold text-foreground/80">
+                    {disciplinasHoje.map((d) => d.nome).join(" e ")}
+                  </strong>
+                  . {checkinsFeitos} de {disciplinasHoje.length} já registrada(s).
                 </p>
               </div>
               <form action={marcarTodasPresentes.bind(null, disciplinasHoje.map((d) => d.id))}>
@@ -194,68 +197,25 @@ export default async function DashboardPage() {
               </form>
             </div>
 
-            <details className="disclosure">
-              <summary className="btn-ghost inline-block">✏️ Corrigir uma disciplina específica</summary>
-              <div className="flex flex-col gap-2 mt-3">
-                {disciplinasHoje.map((disciplina) => {
-                  const status = presencaHojeMap.get(disciplina.id);
-                  return (
-                    <div
-                      key={disciplina.id}
-                      className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
-                    >
-                      <span className="text-sm font-medium">{disciplina.nome}</span>
-                      <div className="flex gap-2">
-                        <form action={marcarPresenca.bind(null, disciplina.id, true)}>
-                          <SubmitButton
-                            pendingLabel="..."
-                            savedLabel="Presente"
-                            className={`text-xs rounded-full px-3 py-1 border ${
-                              status === true
-                                ? "bg-green-600 text-white border-green-600"
-                                : "border-black/15 dark:border-white/20 text-foreground/70"
-                            }`}
-                          >
-                            Presente
-                          </SubmitButton>
-                        </form>
-                        <form action={marcarPresenca.bind(null, disciplina.id, false)}>
-                          <SubmitButton
-                            pendingLabel="..."
-                            savedLabel="Faltei"
-                            className={`text-xs rounded-full px-3 py-1 border ${
-                              status === false
-                                ? "bg-red-600 text-white border-red-600"
-                                : "border-black/15 dark:border-white/20 text-foreground/70"
-                            }`}
-                          >
-                            Faltei
-                          </SubmitButton>
-                        </form>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          </>
-        )}
-
-        {disciplinasOutras.length > 0 && (
-          <details className="disclosure">
-            <summary className="btn-ghost inline-block">
-              📅 Outra disciplina fora do horário de hoje
-            </summary>
-            <div className="flex flex-col gap-2 mt-3">
-              {disciplinasOutras.map((disciplina) => {
+            <div className="flex flex-col gap-2">
+              {disciplinasHoje.map((disciplina) => {
                 const status = presencaHojeMap.get(disciplina.id);
                 return (
                   <div
                     key={disciplina.id}
                     className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
                   >
-                    <span className="text-sm font-medium">{disciplina.nome}</span>
-                    <div className="flex gap-2">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium block truncate">{disciplina.nome}</span>
+                      {(disciplina.professor || disciplina.horario) && (
+                        <span className="text-xs text-foreground/50 block truncate">
+                          {disciplina.professor ? disciplina.professor.nome : null}
+                          {disciplina.professor && disciplina.horario ? " · " : null}
+                          {disciplina.horario ?? null}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
                       <form action={marcarPresenca.bind(null, disciplina.id, true)}>
                         <SubmitButton
                           pendingLabel="..."
@@ -287,7 +247,7 @@ export default async function DashboardPage() {
                 );
               })}
             </div>
-          </details>
+          </>
         )}
       </section>
 
@@ -311,25 +271,6 @@ export default async function DashboardPage() {
               />
             ))}
           </div>
-        </section>
-      )}
-
-      {disciplinasOutras.length > 0 && (
-        <section className="card">
-          <details className="disclosure">
-            <summary className="text-sm text-foreground/70 font-medium">
-              📝 Anotar em outra disciplina fora do horário de hoje
-            </summary>
-            <div className="flex flex-col gap-2 mt-3">
-              {disciplinasOutras.map((disciplina) => (
-                <AnotarDisciplinaDetails
-                  key={disciplina.id}
-                  disciplina={disciplina}
-                  hojeKey={hojeKey}
-                />
-              ))}
-            </div>
-          </details>
         </section>
       )}
 
