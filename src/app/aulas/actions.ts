@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
 import { requireAdmin, requireUser } from "@/lib/auth";
-import type { Anexo } from "@/lib/firestore";
+import { dateOnlyKey, type Anexo } from "@/lib/firestore";
 import {
   buscarNotasCompartilhadas,
   buscarNotasCompartilhadasEmLote,
@@ -77,6 +77,35 @@ export async function updateDisciplina(id: string, formData: FormData) {
       diasSemana,
       horario: horario || null,
     });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+/** Registra (ou corrige, se já existir nesse dia) a frequência de uma disciplina numa data qualquer. */
+export async function registrarPresenca(disciplinaId: string, formData: FormData) {
+  await requireUser();
+
+  const dataStr = String(formData.get("data") || "");
+  if (!dataStr) return;
+  const presente = formData.get("presente") === "true";
+
+  const data = new Date(dataStr);
+  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
+
+  await db
+    .collection("presencas")
+    .doc(id)
+    .set({ disciplinaId, data, presente, createdAt: new Date() }, { merge: true });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+export async function removerPresenca(presencaId: string) {
+  await requireUser();
+
+  await db.collection("presencas").doc(presencaId).delete();
 
   revalidatePath("/aulas");
   revalidatePath("/");
