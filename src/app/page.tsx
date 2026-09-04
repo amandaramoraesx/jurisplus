@@ -333,7 +333,8 @@ export default async function DashboardPage() {
                     <th className="py-1 px-2">Aulas</th>
                     <th className="py-1 px-2">Presenças</th>
                     <th className="py-1 px-2">Faltas</th>
-                    <th className="py-1 pl-2">Frequência</th>
+                    <th className="py-1 px-2">Frequência</th>
+                    <th className="py-1 pl-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -348,13 +349,25 @@ export default async function DashboardPage() {
                         <td className="py-2 px-2">{d.totalAulas}</td>
                         <td className="py-2 px-2">{presentes}</td>
                         <td className="py-2 px-2">{faltas}</td>
-                        <td className="py-2 pl-2">{pct === null ? "—" : `${pct}%`}</td>
+                        <td className="py-2 px-2">{pct === null ? "—" : `${pct}%`}</td>
+                        <td className="py-2 pl-2">
+                          <Link
+                            href={`/aulas?abrir=disciplinas#${d.id}`}
+                            className="text-xs text-foreground/60 hover:underline"
+                          >
+                            editar
+                          </Link>
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
+            <p className="text-xs text-foreground/50 mt-3">
+              Pra registrar, corrigir ou apagar uma frequência (inclusive de dias passados), clique
+              em &ldquo;editar&rdquo; e abra a disciplina em Acadêmico.
+            </p>
           </details>
         </section>
       )}

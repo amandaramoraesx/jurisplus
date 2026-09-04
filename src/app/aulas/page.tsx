@@ -7,6 +7,7 @@ import {
   type Aula,
   type Prova,
   type Nota,
+  type Presenca,
   DIAS_SEMANA_ABREV,
 } from "@/lib/firestore";
 import {
@@ -16,6 +17,8 @@ import {
   restaurarDisciplina,
   excluirDisciplinaPermanentemente,
   createAula,
+  registrarPresenca,
+  removerPresenca,
   gerarQuizDisciplina,
 } from "./actions";
 import { createProfessor, updateProfessor, deleteProfessor } from "@/app/professores/actions";
@@ -49,13 +52,22 @@ export default async function AcademicoPage({
   const isAdmin = user.role === "admin";
   const { abrir } = await searchParams;
 
-  const [disciplinasSnap, professoresSnap, aulasSnap, provasSnap, notasSnap] = await Promise.all([
+  const [disciplinasSnap, professoresSnap, aulasSnap, provasSnap, notasSnap, presencasSnap] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").orderBy("nome", "asc").get(),
     db.collection("aulas").orderBy("data", "desc").get(),
     db.collection("provas").orderBy("data", "asc").get(),
     db.collection("notas").get(),
+    db.collection("presencas").orderBy("data", "desc").get(),
   ]);
+
+  const presencasPorDisciplina = new Map<string, Presenca[]>();
+  for (const doc of presencasSnap.docs) {
+    const presenca = fromDoc<Presenca>(doc);
+    const lista = presencasPorDisciplina.get(presenca.disciplinaId) || [];
+    lista.push(presenca);
+    presencasPorDisciplina.set(presenca.disciplinaId, lista);
+  }
 
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
   const professoresPorId = new Map(professores.map((p) => [p.id, p]));
@@ -83,6 +95,7 @@ export default async function AcademicoPage({
     ...disciplina,
     professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
     aulas: aulasPorDisciplina.get(disciplina.id) || [],
+    presencas: presencasPorDisciplina.get(disciplina.id) || [],
   }));
 
   const disciplinasPorProfessor = new Map<string, number>();
@@ -298,6 +311,74 @@ export default async function AcademicoPage({
                     </Link>
                   ))}
                 </div>
+
+                <details className="disclosure text-sm">
+                  <summary className="text-foreground/70 font-medium">
+                    📊 Frequência {disciplina.presencas.length > 0 ? `(${disciplina.presencas.length})` : ""}
+                  </summary>
+                  <div className="flex flex-col gap-3 mt-3">
+                    <form
+                      action={registrarPresenca.bind(null, disciplina.id)}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <input
+                        name="data"
+                        type="date"
+                        required
+                        defaultValue={new Date().toISOString().slice(0, 10)}
+                        className="field !py-1.5 !text-xs"
+                      />
+                      <button
+                        type="submit"
+                        name="presente"
+                        value="true"
+                        className="text-xs rounded-full px-3 py-1 border border-green-600/40 text-green-700 dark:text-green-400"
+                      >
+                        ✅ Presente
+                      </button>
+                      <button
+                        type="submit"
+                        name="presente"
+                        value="false"
+                        className="text-xs rounded-full px-3 py-1 border border-red-600/40 text-red-600 dark:text-red-400"
+                      >
+                        ❌ Falta
+                      </button>
+                    </form>
+                    <p className="text-xs text-foreground/50">
+                      Registre ou corrija uma data (se já existir frequência naquele dia, isso substitui).
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {disciplina.presencas.length === 0 && (
+                        <p className="text-xs text-foreground/50">Nenhuma frequência registrada ainda.</p>
+                      )}
+                      {disciplina.presencas.map((presenca) => (
+                        <div
+                          key={presenca.id}
+                          className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-xs"
+                        >
+                          <span>{formatDate(presenca.data)}</span>
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={
+                                presenca.presente
+                                  ? "text-green-700 dark:text-green-400 font-medium"
+                                  : "text-red-600 dark:text-red-400 font-medium"
+                              }
+                            >
+                              {presenca.presente ? "Presente" : "Falta"}
+                            </span>
+                            <form action={removerPresenca.bind(null, presenca.id)}>
+                              <button type="submit" className="text-foreground/40 hover:text-red-600">
+                                Remover
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </details>
 
                 <details className="disclosure text-sm">
                   <summary className="text-foreground/70 font-medium">🧠 Quiz de revisão</summary>
