@@ -23,15 +23,17 @@ type DisciplinaComExtras = Disciplina & {
 function AnotarDisciplinaDetails({
   disciplina,
   hojeKey,
+  abrirPorPadrao,
 }: {
   disciplina: DisciplinaComExtras;
   hojeKey: string;
+  abrirPorPadrao?: boolean;
 }) {
   const { resumo, anotacoesLousa, compartilhado } = disciplina.minhaAnotacaoHoje;
   const temAnotacao = Boolean(resumo || anotacoesLousa);
 
   return (
-    <details className="disclosure">
+    <details className="disclosure" open={abrirPorPadrao}>
       <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
         <span>
           {disciplina.nome}
@@ -172,14 +174,23 @@ export default async function DashboardPage() {
   const disciplinasHoje = disciplinas.filter(temHoje);
 
   const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
+  const primeiroNome = (user.nome || user.email || "").split(" ")[0] || "";
+  const tudoFeitoHoje = disciplinasHoje.length > 0 && checkinsFeitos === disciplinasHoje.length;
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold">👋 Início</h1>
-        <p className="text-sm text-foreground/60">
+      <div className="hero-banner">
+        <h1 className="text-2xl font-bold">
+          👋 {primeiroNome ? `Oi, ${primeiroNome}!` : "Oi!"}
+        </h1>
+        <p className="text-sm opacity-85 mt-0.5">
           {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(hoje)}
         </p>
+        {disciplinasHoje.length > 0 && (
+          <p className="text-sm mt-2 font-medium">
+            {tudoFeitoHoje ? "🎉 Check-in do dia todo feito!" : "✅ Bora fazer o check-in de hoje?"}
+          </p>
+        )}
       </div>
 
       <section className="card flex flex-col gap-3">
@@ -297,6 +308,7 @@ export default async function DashboardPage() {
                 key={disciplina.id}
                 disciplina={disciplina}
                 hojeKey={hojeKey}
+                abrirPorPadrao={disciplinasHoje.length <= 2}
               />
             ))}
           </div>
