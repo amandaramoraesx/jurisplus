@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor, type AnotacaoPessoal } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
+import { ShareButton } from "@/components/ShareButton";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,17 @@ async function anotacoesVisiveis(aulaId: string, uid: string): Promise<AnotacaoP
   return snap.docs
     .map((doc) => fromDoc<AnotacaoPessoal>(doc))
     .filter((nota) => nota.uid === uid || nota.compartilhado);
+}
+
+function textoParaCompartilhar(aula: AulaComNotasVisiveis) {
+  const partes = [`${aula.disciplina?.nome ?? "Aula"} — ${aula.tema} (${formatDate(aula.data)})`];
+  if (aula.resumo) partes.push(aula.resumo);
+  if (aula.anotacoesLousa) partes.push(aula.anotacoesLousa);
+  for (const nota of aula.notasVisiveis) {
+    if (nota.resumo) partes.push(nota.resumo);
+    if (nota.anotacoesLousa) partes.push(nota.anotacoesLousa);
+  }
+  return partes.join("\n\n");
 }
 
 function NotaCard({ aula }: { aula: AulaComNotasVisiveis }) {
@@ -70,9 +82,15 @@ function NotaCard({ aula }: { aula: AulaComNotasVisiveis }) {
           ))}
         </ul>
       )}
-      <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
-        Ver aula e gerar PDF →
-      </Link>
+      <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-black/10 dark:border-white/10">
+        <Link href={`/aulas/${aula.id}`} className="btn-ghost">
+          ✏️ Editar
+        </Link>
+        <Link href={`/aulas/${aula.id}/imprimir`} className="btn-ghost">
+          🖨️ Ver / PDF
+        </Link>
+        <ShareButton title={aula.tema} text={textoParaCompartilhar(aula)} />
+      </div>
     </div>
   );
 }
