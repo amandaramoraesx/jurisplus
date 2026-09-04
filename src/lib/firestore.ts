@@ -16,6 +16,20 @@ export type QuizPergunta = {
   explicacao: string | null;
 };
 
+export type MapaMentalRamo = {
+  titulo: string;
+  icone: string;
+  pontos: string[];
+};
+
+/** Mapa mental / infográfico gerado por IA a partir do conteúdo compartilhado de uma aula. */
+export type MapaMental = {
+  titulo: string;
+  subtitulo: string | null;
+  perguntaCentral: string | null;
+  ramos: MapaMentalRamo[];
+};
+
 export type Disciplina = {
   id: string;
   nome: string;
@@ -54,6 +68,8 @@ export type Aula = {
   resumoIA: string | null;
   createdAt: Date;
   quizIA?: QuizPergunta[] | null;
+  mapaMental?: MapaMental | null;
+  mapaMentalGeradoEm?: Date | null;
   anexos?: Anexo[];
 };
 
@@ -151,7 +167,15 @@ export type LembreteEnviado = {
   enviadoEm: Date;
 };
 
-const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm", "updatedAt", "arquivadaEm"];
+const DATE_KEYS = [
+  "data",
+  "createdAt",
+  "enviadoEm",
+  "quizIAGeradoEm",
+  "updatedAt",
+  "arquivadaEm",
+  "mapaMentalGeradoEm",
+];
 
 function toPlain(value: unknown): unknown {
   if (value instanceof Timestamp) return value.toDate();

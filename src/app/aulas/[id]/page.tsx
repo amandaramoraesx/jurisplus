@@ -10,6 +10,7 @@ import {
   salvarAnotacaoPessoal,
   gerarResumoIA,
   gerarQuizAula,
+  gerarMapaMentalAula,
   adicionarAnexoAula,
   removerAnexoAula,
 } from "../actions";
@@ -19,6 +20,7 @@ import { QuizPlayer } from "@/components/QuizPlayer";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ResumoCards } from "@/components/ResumoCards";
 import { ShareButton } from "@/components/ShareButton";
+import { MapaMental } from "@/components/MapaMental";
 
 export const dynamic = "force-dynamic";
 
@@ -320,6 +322,35 @@ export default async function AulaDetailPage({
             <p className="text-xs text-foreground/50">
               Compartilhe anotações (ou gere o resumo inteligente) para ver aqui um resumo em
               cards, rápido de revisar antes da prova.
+            </p>
+          )}
+        </div>
+      </details>
+
+      <details className="disclosure card" open={Boolean(aula.mapaMental)}>
+        <summary className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-sm text-foreground/70">🗺️ Mapa mental da aula</h2>
+          <span className="btn-ghost shrink-0">Abrir</span>
+        </summary>
+        <div className="flex flex-col gap-3 mt-3">
+          {isIAConfigured() && temConteudoCompartilhado && (
+            <form action={gerarMapaMentalAula.bind(null, aula.id)}>
+              <button
+                type="submit"
+                className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+              >
+                {aula.mapaMental ? "Gerar outro mapa mental" : "Gerar mapa mental"}
+              </button>
+            </form>
+          )}
+          {!isIAConfigured() ? (
+            <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
+          ) : aula.mapaMental ? (
+            <MapaMental mapa={aula.mapaMental} />
+          ) : (
+            <p className="text-xs text-foreground/50">
+              Compartilhe anotações e clique em &ldquo;Gerar mapa mental&rdquo; pra organizar a
+              matéria em um infográfico por tópicos, tipo mapa mental.
             </p>
           )}
         </div>
