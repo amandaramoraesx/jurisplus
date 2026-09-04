@@ -135,6 +135,14 @@ body {
   text-decoration: underline;
 }
 
+.hero-banner {
+  border-radius: 1.25rem;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+  color: var(--accent-foreground);
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .icon-badge {
   display: inline-flex;
   align-items: center;

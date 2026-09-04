@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
-import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor } from "@/lib/firestore";
+import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor, type AnotacaoPessoal } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 
@@ -10,12 +10,79 @@ function formatDate(d: Date) {
   return new Intl.DateTimeFormat("pt-BR").format(d);
 }
 
+type AulaComNotasVisiveis = Aula & {
+  disciplina: Disciplina | null;
+  professor: Professor | null;
+  notasVisiveis: AnotacaoPessoal[];
+};
+
+async function anotacoesVisiveis(aulaId: string, uid: string): Promise<AnotacaoPessoal[]> {
+  const snap = await db.collection("aulas").doc(aulaId).collection("anotacoes").get();
+  return snap.docs
+    .map((doc) => fromDoc<AnotacaoPessoal>(doc))
+    .filter((nota) => nota.uid === uid || nota.compartilhado);
+}
+
+function NotaCard({ aula }: { aula: AulaComNotasVisiveis }) {
+  return (
+    <div className="rounded-lg border border-black/10 dark:border-white/10 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-sm">{aula.disciplina?.nome ?? "Disciplina removida"}</p>
+        <span className="text-xs text-foreground/50 shrink-0">
+          {aula.professor ? aula.professor.nome : "sem professor"}
+        </span>
+      </div>
+      <p className="text-xs text-foreground/60 mt-0.5">{aula.tema}</p>
+      {(aula.resumo || aula.anotacoesLousa) && (
+        <div className="mt-2">
+          {aula.resumo && <p className="text-sm whitespace-pre-wrap">{aula.resumo}</p>}
+          {aula.anotacoesLousa && (
+            <p className="text-sm whitespace-pre-wrap font-mono mt-1">{aula.anotacoesLousa}</p>
+          )}
+        </div>
+      )}
+      {aula.notasVisiveis.map((nota) => (
+        <div key={nota.id} className="mt-2">
+          <p className="text-[10px] font-semibold text-foreground/50">
+            {nota.compartilhado ? `🌐 ${nota.nome}` : "🔒 minha anotação"}
+          </p>
+          {nota.resumo && <p className="text-sm whitespace-pre-wrap">{nota.resumo}</p>}
+          {nota.anotacoesLousa && (
+            <p className="text-sm whitespace-pre-wrap font-mono mt-1">{nota.anotacoesLousa}</p>
+          )}
+        </div>
+      ))}
+      {aula.anexos && aula.anexos.length > 0 && (
+        <ul className="flex flex-col gap-1 mt-2">
+          {aula.anexos.map((anexo) => (
+            <li key={anexo.id}>
+              <a
+                href={`/api/anexos/${aula.id}/${anexo.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs hover:underline"
+              >
+                <AnexoIcone tipo={anexo.tipo} />
+                <span className="truncate">{anexo.nome}</span>
+                <span className="text-foreground/50 shrink-0">({formatBytes(anexo.tamanho)})</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
+        Ver aula e gerar PDF →
+      </Link>
+    </div>
+  );
+}
+
 export default async function HistoricoPage({
   searchParams,
 }: {
   searchParams: Promise<{ data?: string; professorId?: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const { data: dataSelecionada, professorId: professorIdSelecionado } = await searchParams;
 
   const [aulasSnap, disciplinasSnap, professoresSnap] = await Promise.all([
@@ -29,29 +96,44 @@ export default async function HistoricoPage({
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
   const professoresPorId = new Map(professores.map((p) => [p.id, p]));
 
-  const aulasComConteudo = aulasSnap.docs
-    .map((doc) => fromDoc<Aula>(doc))
-    .filter((aula) => aula.resumo || aula.anotacoesLousa || aula.anexos?.length)
-    .map((aula) => {
-      const disciplina = disciplinasPorId.get(aula.disciplinaId) ?? null;
-      const professor = disciplina?.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null;
-      return { ...aula, disciplina, professor };
-    });
+  const aulasBase = aulasSnap.docs.map((doc) => {
+    const aula = fromDoc<Aula>(doc);
+    const disciplina = disciplinasPorId.get(aula.disciplinaId) ?? null;
+    const professor = disciplina?.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null;
+    return { ...aula, disciplina, professor };
+  });
 
-  const aulasDoDia = dataSelecionada
-    ? aulasComConteudo.filter((aula) => dateOnlyKey(aula.data) === dataSelecionada)
+  // Filtra por data/professor primeiro (metadados, baratos) — só depois busca as anotações
+  // (que exigem uma leitura por aula) do conjunto já reduzido.
+  const aulasDoDiaBase = dataSelecionada
+    ? aulasBase.filter((aula) => dateOnlyKey(aula.data) === dataSelecionada)
+    : [];
+  const aulasDoProfessorBase = professorIdSelecionado
+    ? aulasBase.filter((aula) => aula.professor?.id === professorIdSelecionado)
     : [];
 
-  const aulasDoProfessor = professorIdSelecionado
-    ? aulasComConteudo.filter((aula) => aula.professor?.id === professorIdSelecionado)
-    : [];
+  async function comNotasVisiveis(lista: typeof aulasBase): Promise<AulaComNotasVisiveis[]> {
+    const notas = await Promise.all(lista.map((aula) => anotacoesVisiveis(aula.id, user.uid)));
+    return lista
+      .map((aula, i) => ({ ...aula, notasVisiveis: notas[i] }))
+      .filter(
+        (aula) =>
+          aula.resumo || aula.anotacoesLousa || aula.anexos?.length || aula.notasVisiveis.length > 0
+      );
+  }
+
+  const [aulasDoDia, aulasDoProfessor] = await Promise.all([
+    comNotasVisiveis(aulasDoDiaBase),
+    comNotasVisiveis(aulasDoProfessorBase),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold">🗓️ Histórico de anotações</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque as anotações e lousas já registradas por data ou por professor.
+          Busque as anotações e lousas já registradas por data ou por professor — mostra suas
+          anotações e as que os colegas compartilharam.
         </p>
       </div>
 
@@ -84,42 +166,7 @@ export default async function HistoricoPage({
                 </p>
               )}
               {aulasDoDia.map((aula) => (
-                <div key={aula.id} className="rounded-lg border border-black/10 dark:border-white/10 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-sm">{aula.disciplina?.nome ?? "Disciplina removida"}</p>
-                    <span className="text-xs text-foreground/50 shrink-0">
-                      {aula.professor ? aula.professor.nome : "sem professor"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-foreground/60 mt-0.5">{aula.tema}</p>
-                  {aula.resumo && <p className="text-sm mt-2 whitespace-pre-wrap">{aula.resumo}</p>}
-                  {aula.anotacoesLousa && (
-                    <p className="text-sm mt-2 whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
-                  )}
-                  {aula.anexos && aula.anexos.length > 0 && (
-                    <ul className="flex flex-col gap-1 mt-2">
-                      {aula.anexos.map((anexo) => (
-                        <li key={anexo.id}>
-                          <a
-                            href={`/api/anexos/${aula.id}/${anexo.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs hover:underline"
-                          >
-                            <AnexoIcone tipo={anexo.tipo} />
-                            <span className="truncate">{anexo.nome}</span>
-                            <span className="text-foreground/50 shrink-0">
-                              ({formatBytes(anexo.tamanho)})
-                            </span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
-                    Ver aula e gerar PDF →
-                  </Link>
-                </div>
+                <NotaCard key={aula.id} aula={aula} />
               ))}
             </div>
           )}
@@ -168,40 +215,7 @@ export default async function HistoricoPage({
                 </p>
               )}
               {aulasDoProfessor.map((aula) => (
-                <div key={aula.id} className="rounded-lg border border-black/10 dark:border-white/10 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-sm">{aula.disciplina?.nome ?? "Disciplina removida"}</p>
-                    <span className="text-xs text-foreground/50 shrink-0">{formatDate(aula.data)}</span>
-                  </div>
-                  <p className="text-xs text-foreground/60 mt-0.5">{aula.tema}</p>
-                  {aula.resumo && <p className="text-sm mt-2 whitespace-pre-wrap">{aula.resumo}</p>}
-                  {aula.anotacoesLousa && (
-                    <p className="text-sm mt-2 whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
-                  )}
-                  {aula.anexos && aula.anexos.length > 0 && (
-                    <ul className="flex flex-col gap-1 mt-2">
-                      {aula.anexos.map((anexo) => (
-                        <li key={anexo.id}>
-                          <a
-                            href={`/api/anexos/${aula.id}/${anexo.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs hover:underline"
-                          >
-                            <AnexoIcone tipo={anexo.tipo} />
-                            <span className="truncate">{anexo.nome}</span>
-                            <span className="text-foreground/50 shrink-0">
-                              ({formatBytes(anexo.tamanho)})
-                            </span>
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <Link href={`/aulas/${aula.id}`} className="text-xs text-foreground/60 hover:underline mt-2 inline-block">
-                    Ver aula e gerar PDF →
-                  </Link>
-                </div>
+                <NotaCard key={aula.id} aula={aula} />
               ))}
             </div>
           )}

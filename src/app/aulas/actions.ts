@@ -7,6 +7,11 @@ import { redirect } from "next/navigation";
 import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import type { Anexo } from "@/lib/firestore";
+import {
+  buscarNotasCompartilhadas,
+  buscarNotasCompartilhadasEmLote,
+  textoCompartilhadoParaIA,
+} from "@/lib/anotacoes";
 
 const TIPOS_ANEXO_PERMITIDOS: Record<string, string> = {
   "application/pdf": "PDF",
@@ -83,8 +88,38 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export async function deleteDisciplina(id: string) {
+/**
+ * Move a disciplina pra lixeira: some das listas ativas, mas não apaga nada (aulas, anotações,
+ * presenças, provas e notas continuam intactas e recuperáveis). Ver excluirDisciplinaPermanentemente
+ * pra apagar de verdade, só depois de já estar arquivada.
+ */
+export async function arquivarDisciplina(id: string) {
   await requireAdmin();
+
+  await db.collection("disciplinas").doc(id).update({ arquivadaEm: new Date() });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+export async function restaurarDisciplina(id: string) {
+  await requireAdmin();
+
+  await db.collection("disciplinas").doc(id).update({ arquivadaEm: null });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+/** Apagamento de verdade (sem volta) — só permitido numa disciplina que já está na lixeira. */
+export async function excluirDisciplinaPermanentemente(id: string) {
+  await requireAdmin();
+
+  const disciplinaDoc = await db.collection("disciplinas").doc(id).get();
+  if (!disciplinaDoc.exists) return;
+  if (!disciplinaDoc.data()?.arquivadaEm) {
+    throw new Error("Arquive a disciplina (mande pra lixeira) antes de excluir definitivamente.");
+  }
 
   const [aulasSnap, presencasSnap, notasSnap, provasSnap, gruposSnap] = await Promise.all([
     db.collection("aulas").where("disciplinaId", "==", id).get(),
@@ -95,11 +130,14 @@ export async function deleteDisciplina(id: string) {
   ]);
 
   const aulaIds = aulasSnap.docs.map((d) => d.id);
-  const favoritosSnaps = await Promise.all(
-    chunk(aulaIds, 10).map((ids) =>
-      ids.length ? db.collection("vademecum_favoritos").where("aulaId", "in", ids).get() : null
-    )
-  );
+  const [favoritosSnaps, anotacoesSnaps] = await Promise.all([
+    Promise.all(
+      chunk(aulaIds, 10).map((ids) =>
+        ids.length ? db.collection("vademecum_favoritos").where("aulaId", "in", ids).get() : null
+      )
+    ),
+    Promise.all(aulaIds.map((aulaId) => db.collection("aulas").doc(aulaId).collection("anotacoes").get())),
+  ]);
 
   const batch = db.batch();
   for (const doc of aulasSnap.docs) batch.delete(doc.ref);
@@ -110,6 +148,9 @@ export async function deleteDisciplina(id: string) {
   for (const snap of favoritosSnaps) {
     if (!snap) continue;
     for (const doc of snap.docs) batch.update(doc.ref, { aulaId: null });
+  }
+  for (const snap of anotacoesSnaps) {
+    for (const doc of snap.docs) batch.delete(doc.ref);
   }
   batch.delete(db.collection("disciplinas").doc(id));
   await batch.commit();
@@ -127,8 +168,8 @@ export async function createAula(disciplinaId: string, formData: FormData) {
     disciplinaId,
     tema,
     data: new Date(dataStr),
-    resumo: String(formData.get("resumo") || "").trim() || null,
-    anotacoesLousa: String(formData.get("anotacoesLousa") || "").trim() || null,
+    resumo: null,
+    anotacoesLousa: null,
     resumoIA: null,
     createdAt: new Date(),
   });
@@ -147,8 +188,6 @@ export async function updateAula(aulaId: string, formData: FormData) {
     .update({
       tema,
       ...(dataStr ? { data: new Date(dataStr) } : {}),
-      resumo: String(formData.get("resumo") || "").trim() || null,
-      anotacoesLousa: String(formData.get("anotacoesLousa") || "").trim() || null,
     });
 
   revalidatePath("/aulas");
@@ -156,14 +195,46 @@ export async function updateAula(aulaId: string, formData: FormData) {
   revalidatePath("/historico");
 }
 
+/** Anotação pessoal do login atual numa aula — privada por padrão, só aparece pros colegas se "compartilhado". */
+export async function salvarAnotacaoPessoal(aulaId: string, formData: FormData) {
+  const user = await requireUser();
+
+  const resumo = String(formData.get("resumo") || "").trim();
+  const anotacoesLousa = String(formData.get("anotacoesLousa") || "").trim();
+  const compartilhado = formData.get("compartilhado") === "on";
+
+  await db
+    .collection("aulas")
+    .doc(aulaId)
+    .collection("anotacoes")
+    .doc(user.uid)
+    .set(
+      {
+        uid: user.uid,
+        nome: user.nome || user.email || "Colega",
+        resumo: resumo || null,
+        anotacoesLousa: anotacoesLousa || null,
+        compartilhado,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
+
+  revalidatePath("/");
+  revalidatePath("/aulas");
+  revalidatePath(`/aulas/${aulaId}`);
+  revalidatePath("/historico");
+}
+
 export async function deleteAula(aulaId: string, disciplinaId: string) {
-  const favoritosSnap = await db
-    .collection("vademecum_favoritos")
-    .where("aulaId", "==", aulaId)
-    .get();
+  const [favoritosSnap, anotacoesSnap] = await Promise.all([
+    db.collection("vademecum_favoritos").where("aulaId", "==", aulaId).get(),
+    db.collection("aulas").doc(aulaId).collection("anotacoes").get(),
+  ]);
 
   const batch = db.batch();
   for (const doc of favoritosSnap.docs) batch.update(doc.ref, { aulaId: null });
+  for (const doc of anotacoesSnap.docs) batch.delete(doc.ref);
   batch.delete(db.collection("aulas").doc(aulaId));
   await batch.commit();
 
@@ -235,9 +306,9 @@ export async function gerarResumoIA(aulaId: string) {
   const aula = aulaDoc.data();
   if (!aula) throw new Error("Aula não encontrada");
 
-  if (!aula.resumo && !aula.anotacoesLousa) {
-    return;
-  }
+  const compartilhadas = await buscarNotasCompartilhadas(aulaId);
+  const conteudo = textoCompartilhadoParaIA(aula, compartilhadas);
+  if (!conteudo) return;
 
   const client = getAnthropicClient();
 
@@ -249,15 +320,12 @@ export async function gerarResumoIA(aulaId: string) {
         role: "user",
         content: [
           `Você é um assistente de estudos para uma aluna de Direito.`,
-          `Com base no resumo da aula e nas anotações da lousa abaixo, escreva um resumo inteligente e organizado (em português) para revisão antes de provas: destaque os conceitos-chave, defina termos importantes e, se fizer sentido, cite artigos de lei mencionados. Use tópicos curtos. Não invente conteúdo que não esteja implícito no material.`,
+          `Com base nas anotações da aula abaixo (podem vir de mais de um colega), escreva um resumo inteligente e organizado (em português) para revisão antes de provas: destaque os conceitos-chave, defina termos importantes e, se fizer sentido, cite artigos de lei mencionados. Use tópicos curtos. Não invente conteúdo que não esteja implícito no material.`,
           ``,
           `Tema da aula: ${aula.tema}`,
           ``,
-          `Resumo da aula:`,
-          aula.resumo || "(não preenchido)",
-          ``,
-          `Anotações da lousa:`,
-          aula.anotacoesLousa || "(não preenchido)",
+          `Anotações:`,
+          conteudo,
         ].join("\n"),
       },
     ],
@@ -278,9 +346,11 @@ export async function gerarQuizAula(aulaId: string) {
   const aulaDoc = await db.collection("aulas").doc(aulaId).get();
   const aula = aulaDoc.data();
   if (!aula) throw new Error("Aula não encontrada");
-  if (!aula.resumo && !aula.anotacoesLousa) return;
 
-  const conteudo = [aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n\n");
+  const compartilhadas = await buscarNotasCompartilhadas(aulaId);
+  const conteudo = textoCompartilhadoParaIA(aula, compartilhadas);
+  if (!conteudo) return;
+
   const quizIA = await gerarQuizComIA(`a aula "${aula.tema}"`, conteudo, 5);
 
   await db.collection("aulas").doc(aulaId).update({ quizIA });
@@ -296,10 +366,15 @@ export async function gerarQuizDisciplina(disciplinaId: string) {
   const disciplina = disciplinaDoc.data();
   if (!disciplina) throw new Error("Disciplina não encontrada");
 
-  const conteudos = aulasSnap.docs
-    .map((doc) => doc.data())
-    .filter((aula) => aula.resumo || aula.anotacoesLousa)
-    .map((aula) => `Aula "${aula.tema}":\n${[aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n")}`);
+  const aulas = aulasSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as { id: string; tema: string; resumo?: string | null; anotacoesLousa?: string | null });
+  const compartilhadasPorAula = await buscarNotasCompartilhadasEmLote(aulas.map((a) => a.id));
+
+  const conteudos = aulas
+    .map((aula) => {
+      const conteudo = textoCompartilhadoParaIA(aula, compartilhadasPorAula.get(aula.id) ?? []);
+      return conteudo ? `Aula "${aula.tema}":\n${conteudo}` : null;
+    })
+    .filter((v): v is string => Boolean(v));
 
   if (conteudos.length === 0) return;
 

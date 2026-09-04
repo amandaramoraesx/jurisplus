@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor, DIAS_SEMANA } from "@/lib/firestore";
+import { requireUser } from "@/lib/auth";
+import { buscarMinhaAnotacao } from "@/lib/anotacoes";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 
@@ -15,18 +17,23 @@ type DisciplinaComExtras = Disciplina & {
   professor: Professor | null;
   totalAulas: number;
   presencas: Presenca[];
-  anotacaoHoje: { resumo: string; anotacoesLousa: string };
+  minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string; compartilhado: boolean };
 };
 
 function AnotarDisciplinaDetails({
   disciplina,
   hojeKey,
+  abrirPorPadrao,
 }: {
   disciplina: DisciplinaComExtras;
   hojeKey: string;
+  abrirPorPadrao?: boolean;
 }) {
+  const { resumo, anotacoesLousa, compartilhado } = disciplina.minhaAnotacaoHoje;
+  const temAnotacao = Boolean(resumo || anotacoesLousa);
+
   return (
-    <details className="disclosure">
+    <details className="disclosure" open={abrirPorPadrao}>
       <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
         <span>
           {disciplina.nome}
@@ -34,9 +41,15 @@ function AnotarDisciplinaDetails({
             <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
           ) : null}
         </span>
-        {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
-          <span className="text-[10px] rounded-full px-2 py-0.5 bg-green-600/10 text-green-700 dark:text-green-400 shrink-0">
-            ✅ já tem anotação hoje
+        {temAnotacao && (
+          <span
+            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ${
+              compartilhado
+                ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
+                : "bg-green-600/10 text-green-700 dark:text-green-400"
+            }`}
+          >
+            {compartilhado ? "🌐 compartilhada com colegas" : "🔒 anotação salva (só sua)"}
           </span>
         )}
       </summary>
@@ -45,7 +58,7 @@ function AnotarDisciplinaDetails({
           Anotações
           <textarea
             name="resumo"
-            defaultValue={disciplina.anotacaoHoje.resumo}
+            defaultValue={resumo}
             rows={4}
             placeholder="Suas anotações sobre a aula..."
             className="field"
@@ -55,17 +68,21 @@ function AnotarDisciplinaDetails({
           Lousa
           <textarea
             name="anotacoesLousa"
-            defaultValue={disciplina.anotacaoHoje.anotacoesLousa}
+            defaultValue={anotacoesLousa}
             rows={4}
             placeholder="O que o professor escreveu na lousa..."
             className="field font-mono"
           />
         </label>
+        <label className="flex items-center gap-2 text-xs text-foreground/70">
+          <input type="checkbox" name="compartilhado" defaultChecked={compartilhado} className="accent-[var(--accent)]" />
+          🌐 Compartilhar essa anotação com os colegas (senão só você vê)
+        </label>
         <div className="flex items-center gap-3">
           <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
             💾 Salvar anotação
           </SubmitButton>
-          {(disciplina.anotacaoHoje.resumo || disciplina.anotacaoHoje.anotacoesLousa) && (
+          {temAnotacao && (
             <Link
               href={`/aulas/${disciplina.id}_${hojeKey}`}
               className="text-xs text-foreground/60 hover:underline"
@@ -80,6 +97,7 @@ function AnotarDisciplinaDetails({
 }
 
 export default async function DashboardPage() {
+  const user = await requireUser();
   const hoje = todayDateOnly();
   const hojeKey = dateOnlyKey(hoje);
 
@@ -100,17 +118,26 @@ export default async function DashboardPage() {
     aulasPorDisciplina.set(disciplinaId, (aulasPorDisciplina.get(disciplinaId) || 0) + 1);
   }
 
-  // aula "de hoje" de cada disciplina, gravada com id determinístico pela anotação rápida
-  const anotacaoHojePorDisciplina = new Map<string, { resumo: string; anotacoesLousa: string }>();
-  for (const doc of aulasSnap.docs) {
-    const disciplinaId = doc.data().disciplinaId as string;
-    if (doc.id === `${disciplinaId}_${hojeKey}`) {
-      anotacaoHojePorDisciplina.set(disciplinaId, {
-        resumo: (doc.data().resumo as string) || "",
-        anotacoesLousa: (doc.data().anotacoesLousa as string) || "",
-      });
-    }
-  }
+  // aula "de hoje" de cada disciplina tem id determinístico; busca a anotação pessoal (privada por
+  // padrão) do login atual pra cada uma delas, em paralelo.
+  const disciplinaIdsComAulaHoje = disciplinasSnap.docs
+    .map((doc) => doc.id)
+    .filter((disciplinaId) => aulasSnap.docs.some((doc) => doc.id === `${disciplinaId}_${hojeKey}`));
+  const minhasAnotacoesHoje = await Promise.all(
+    disciplinaIdsComAulaHoje.map((disciplinaId) =>
+      buscarMinhaAnotacao(`${disciplinaId}_${hojeKey}`, user.uid)
+    )
+  );
+  const anotacaoHojePorDisciplina = new Map(
+    disciplinaIdsComAulaHoje.map((disciplinaId, i) => [
+      disciplinaId,
+      {
+        resumo: minhasAnotacoesHoje[i]?.resumo || "",
+        anotacoesLousa: minhasAnotacoesHoje[i]?.anotacoesLousa || "",
+        compartilhado: minhasAnotacoesHoje[i]?.compartilhado || false,
+      },
+    ])
+  );
 
   const presencas = presencasSnap.docs.map((doc) => fromDoc<Presenca>(doc));
   const presencasPorDisciplina = new Map<string, Presenca[]>();
@@ -121,16 +148,20 @@ export default async function DashboardPage() {
     );
   }
 
-  const disciplinas = disciplinasSnap.docs.map((doc) => {
-    const disciplina = fromDoc<Disciplina>(doc);
-    return {
+  const disciplinas = disciplinasSnap.docs
+    .map((doc) => fromDoc<Disciplina>(doc))
+    .filter((disciplina) => !disciplina.arquivadaEm)
+    .map((disciplina) => ({
       ...disciplina,
       professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
       totalAulas: aulasPorDisciplina.get(disciplina.id) || 0,
       presencas: presencasPorDisciplina.get(disciplina.id) || [],
-      anotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || { resumo: "", anotacoesLousa: "" },
-    };
-  });
+      minhaAnotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || {
+        resumo: "",
+        anotacoesLousa: "",
+        compartilhado: false,
+      },
+    }));
 
   const presencaHojeMap = new Map(
     presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])
@@ -141,17 +172,25 @@ export default async function DashboardPage() {
   const temHoje = (d: (typeof disciplinas)[number]) =>
     !d.diasSemana || d.diasSemana.length === 0 || d.diasSemana.includes(hojeDiaSemana);
   const disciplinasHoje = disciplinas.filter(temHoje);
-  const disciplinasOutras = disciplinas.filter((d) => !temHoje(d));
 
   const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
+  const primeiroNome = (user.nome || user.email || "").split(" ")[0] || "";
+  const tudoFeitoHoje = disciplinasHoje.length > 0 && checkinsFeitos === disciplinasHoje.length;
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold">👋 Início</h1>
-        <p className="text-sm text-foreground/60">
+      <div className="hero-banner">
+        <h1 className="text-2xl font-bold">
+          👋 {primeiroNome ? `Oi, ${primeiroNome}!` : "Oi!"}
+        </h1>
+        <p className="text-sm opacity-85 mt-0.5">
           {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(hoje)}
         </p>
+        {disciplinasHoje.length > 0 && (
+          <p className="text-sm mt-2 font-medium">
+            {tudoFeitoHoje ? "🎉 Check-in do dia todo feito!" : "✅ Bora fazer o check-in de hoje?"}
+          </p>
+        )}
       </div>
 
       <section className="card flex flex-col gap-3">
@@ -184,7 +223,11 @@ export default async function DashboardPage() {
                   Check-in de hoje
                 </h2>
                 <p className="text-xs text-foreground/60 mt-0.5">
-                  {checkinsFeitos} de {disciplinasHoje.length} disciplina(s) já registrada(s)
+                  Hoje é {DIAS_SEMANA[hojeDiaSemana]}, você tem aula de{" "}
+                  <strong className="font-semibold text-foreground/80">
+                    {disciplinasHoje.map((d) => d.nome).join(" e ")}
+                  </strong>
+                  . {checkinsFeitos} de {disciplinasHoje.length} já registrada(s).
                 </p>
               </div>
               <form action={marcarTodasPresentes.bind(null, disciplinasHoje.map((d) => d.id))}>
@@ -194,68 +237,25 @@ export default async function DashboardPage() {
               </form>
             </div>
 
-            <details className="disclosure">
-              <summary className="btn-ghost inline-block">✏️ Corrigir uma disciplina específica</summary>
-              <div className="flex flex-col gap-2 mt-3">
-                {disciplinasHoje.map((disciplina) => {
-                  const status = presencaHojeMap.get(disciplina.id);
-                  return (
-                    <div
-                      key={disciplina.id}
-                      className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
-                    >
-                      <span className="text-sm font-medium">{disciplina.nome}</span>
-                      <div className="flex gap-2">
-                        <form action={marcarPresenca.bind(null, disciplina.id, true)}>
-                          <SubmitButton
-                            pendingLabel="..."
-                            savedLabel="Presente"
-                            className={`text-xs rounded-full px-3 py-1 border ${
-                              status === true
-                                ? "bg-green-600 text-white border-green-600"
-                                : "border-black/15 dark:border-white/20 text-foreground/70"
-                            }`}
-                          >
-                            Presente
-                          </SubmitButton>
-                        </form>
-                        <form action={marcarPresenca.bind(null, disciplina.id, false)}>
-                          <SubmitButton
-                            pendingLabel="..."
-                            savedLabel="Faltei"
-                            className={`text-xs rounded-full px-3 py-1 border ${
-                              status === false
-                                ? "bg-red-600 text-white border-red-600"
-                                : "border-black/15 dark:border-white/20 text-foreground/70"
-                            }`}
-                          >
-                            Faltei
-                          </SubmitButton>
-                        </form>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </details>
-          </>
-        )}
-
-        {disciplinasOutras.length > 0 && (
-          <details className="disclosure">
-            <summary className="btn-ghost inline-block">
-              📅 Outra disciplina fora do horário de hoje
-            </summary>
-            <div className="flex flex-col gap-2 mt-3">
-              {disciplinasOutras.map((disciplina) => {
+            <div className="flex flex-col gap-2">
+              {disciplinasHoje.map((disciplina) => {
                 const status = presencaHojeMap.get(disciplina.id);
                 return (
                   <div
                     key={disciplina.id}
                     className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
                   >
-                    <span className="text-sm font-medium">{disciplina.nome}</span>
-                    <div className="flex gap-2">
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium block truncate">{disciplina.nome}</span>
+                      {(disciplina.professor || disciplina.horario) && (
+                        <span className="text-xs text-foreground/50 block truncate">
+                          {disciplina.professor ? disciplina.professor.nome : null}
+                          {disciplina.professor && disciplina.horario ? " · " : null}
+                          {disciplina.horario ?? null}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
                       <form action={marcarPresenca.bind(null, disciplina.id, true)}>
                         <SubmitButton
                           pendingLabel="..."
@@ -287,7 +287,7 @@ export default async function DashboardPage() {
                 );
               })}
             </div>
-          </details>
+          </>
         )}
       </section>
 
@@ -308,28 +308,10 @@ export default async function DashboardPage() {
                 key={disciplina.id}
                 disciplina={disciplina}
                 hojeKey={hojeKey}
+                abrirPorPadrao={disciplinasHoje.length <= 2}
               />
             ))}
           </div>
-        </section>
-      )}
-
-      {disciplinasOutras.length > 0 && (
-        <section className="card">
-          <details className="disclosure">
-            <summary className="text-sm text-foreground/70 font-medium">
-              📝 Anotar em outra disciplina fora do horário de hoje
-            </summary>
-            <div className="flex flex-col gap-2 mt-3">
-              {disciplinasOutras.map((disciplina) => (
-                <AnotarDisciplinaDetails
-                  key={disciplina.id}
-                  disciplina={disciplina}
-                  hojeKey={hojeKey}
-                />
-              ))}
-            </div>
-          </details>
         </section>
       )}
 
