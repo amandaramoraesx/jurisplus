@@ -12,7 +12,9 @@ import {
 import {
   createDisciplina,
   updateDisciplina,
-  deleteDisciplina,
+  arquivarDisciplina,
+  restaurarDisciplina,
+  excluirDisciplinaPermanentemente,
   createAula,
   gerarQuizDisciplina,
 } from "./actions";
@@ -72,8 +74,10 @@ export default async function AcademicoPage({
     aulasPorDisciplina.set(aula.disciplinaId, lista);
   }
 
-  const disciplinasBase = disciplinasSnap.docs.map((doc) => fromDoc<Disciplina>(doc));
-  const disciplinasPorId = new Map(disciplinasBase.map((d) => [d.id, d]));
+  const todasDisciplinas = disciplinasSnap.docs.map((doc) => fromDoc<Disciplina>(doc));
+  const disciplinasBase = todasDisciplinas.filter((d) => !d.arquivadaEm);
+  const disciplinasArquivadas = todasDisciplinas.filter((d) => d.arquivadaEm);
+  const disciplinasPorId = new Map(todasDisciplinas.map((d) => [d.id, d]));
 
   const disciplinas = disciplinasBase.map((disciplina) => ({
     ...disciplina,
@@ -190,9 +194,9 @@ export default async function AcademicoPage({
                     )}
                   </div>
                   {isAdmin && (
-                    <form action={deleteDisciplina.bind(null, disciplina.id)}>
+                    <form action={arquivarDisciplina.bind(null, disciplina.id)}>
                       <button type="submit" className="btn-danger-text">
-                        Remover
+                        🗑️ Mandar pra lixeira
                       </button>
                     </form>
                   )}
@@ -329,6 +333,47 @@ export default async function AcademicoPage({
           </div>
         </div>
       </details>
+
+      {/* ---------- Lixeira de disciplinas ---------- */}
+      {isAdmin && disciplinasArquivadas.length > 0 && (
+        <details className="disclosure card" id="lixeira">
+          <summary className="flex items-center justify-between gap-3">
+            <h2 className="font-semibold flex items-center gap-2">
+              <span className="icon-badge bg-black/5 dark:bg-white/10 text-foreground/60">🗑️</span>
+              Lixeira
+            </h2>
+            <span className="text-xs text-foreground/50 shrink-0">
+              {disciplinasArquivadas.length} disciplina(s)
+            </span>
+          </summary>
+          <div className="flex flex-col gap-3 mt-4">
+            <p className="text-xs text-foreground/50">
+              Disciplinas arquivadas somem das listas, mas as aulas, anotações, presenças e provas
+              continuam guardadas. Restaure quando quiser, ou exclua definitivamente (aí não tem volta).
+            </p>
+            {disciplinasArquivadas.map((disciplina) => (
+              <div key={disciplina.id} className="card flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-sm">{disciplina.nome}</p>
+                  <p className="text-xs text-foreground/60">{disciplina.semestre}</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <form action={restaurarDisciplina.bind(null, disciplina.id)}>
+                    <button type="submit" className="btn-ghost">
+                      ♻️ Restaurar
+                    </button>
+                  </form>
+                  <form action={excluirDisciplinaPermanentemente.bind(null, disciplina.id)}>
+                    <button type="submit" className="btn-danger-text">
+                      Excluir definitivamente
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       {/* ---------- Professores ---------- */}
       <details className="disclosure card" id="professores" open={abrir === "professores"}>

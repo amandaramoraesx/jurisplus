@@ -146,9 +146,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const disciplinas = disciplinasSnap.docs.map((doc) => {
-    const disciplina = fromDoc<Disciplina>(doc);
-    return {
+  const disciplinas = disciplinasSnap.docs
+    .map((doc) => fromDoc<Disciplina>(doc))
+    .filter((disciplina) => !disciplina.arquivadaEm)
+    .map((disciplina) => ({
       ...disciplina,
       professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
       totalAulas: aulasPorDisciplina.get(disciplina.id) || 0,
@@ -158,8 +159,7 @@ export default async function DashboardPage() {
         anotacoesLousa: "",
         compartilhado: false,
       },
-    };
-  });
+    }));
 
   const presencaHojeMap = new Map(
     presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])

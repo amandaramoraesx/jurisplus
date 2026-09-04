@@ -88,8 +88,38 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export async function deleteDisciplina(id: string) {
+/**
+ * Move a disciplina pra lixeira: some das listas ativas, mas não apaga nada (aulas, anotações,
+ * presenças, provas e notas continuam intactas e recuperáveis). Ver excluirDisciplinaPermanentemente
+ * pra apagar de verdade, só depois de já estar arquivada.
+ */
+export async function arquivarDisciplina(id: string) {
   await requireAdmin();
+
+  await db.collection("disciplinas").doc(id).update({ arquivadaEm: new Date() });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+export async function restaurarDisciplina(id: string) {
+  await requireAdmin();
+
+  await db.collection("disciplinas").doc(id).update({ arquivadaEm: null });
+
+  revalidatePath("/aulas");
+  revalidatePath("/");
+}
+
+/** Apagamento de verdade (sem volta) — só permitido numa disciplina que já está na lixeira. */
+export async function excluirDisciplinaPermanentemente(id: string) {
+  await requireAdmin();
+
+  const disciplinaDoc = await db.collection("disciplinas").doc(id).get();
+  if (!disciplinaDoc.exists) return;
+  if (!disciplinaDoc.data()?.arquivadaEm) {
+    throw new Error("Arquive a disciplina (mande pra lixeira) antes de excluir definitivamente.");
+  }
 
   const [aulasSnap, presencasSnap, notasSnap, provasSnap, gruposSnap] = await Promise.all([
     db.collection("aulas").where("disciplinaId", "==", id).get(),
@@ -100,11 +130,14 @@ export async function deleteDisciplina(id: string) {
   ]);
 
   const aulaIds = aulasSnap.docs.map((d) => d.id);
-  const favoritosSnaps = await Promise.all(
-    chunk(aulaIds, 10).map((ids) =>
-      ids.length ? db.collection("vademecum_favoritos").where("aulaId", "in", ids).get() : null
-    )
-  );
+  const [favoritosSnaps, anotacoesSnaps] = await Promise.all([
+    Promise.all(
+      chunk(aulaIds, 10).map((ids) =>
+        ids.length ? db.collection("vademecum_favoritos").where("aulaId", "in", ids).get() : null
+      )
+    ),
+    Promise.all(aulaIds.map((aulaId) => db.collection("aulas").doc(aulaId).collection("anotacoes").get())),
+  ]);
 
   const batch = db.batch();
   for (const doc of aulasSnap.docs) batch.delete(doc.ref);
@@ -115,6 +148,9 @@ export async function deleteDisciplina(id: string) {
   for (const snap of favoritosSnaps) {
     if (!snap) continue;
     for (const doc of snap.docs) batch.update(doc.ref, { aulaId: null });
+  }
+  for (const snap of anotacoesSnaps) {
+    for (const doc of snap.docs) batch.delete(doc.ref);
   }
   batch.delete(db.collection("disciplinas").doc(id));
   await batch.commit();

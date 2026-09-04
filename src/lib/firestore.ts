@@ -28,6 +28,8 @@ export type Disciplina = {
   horario?: string | null;
   quizIA?: QuizPergunta[] | null;
   quizIAGeradoEm?: Date | null;
+  /** Quando preenchido, a disciplina foi movida pra lixeira (some das listas, mas nada foi apagado). */
+  arquivadaEm?: Date | null;
 };
 
 export type Anexo = {
@@ -149,7 +151,7 @@ export type LembreteEnviado = {
   enviadoEm: Date;
 };
 
-const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm", "updatedAt"];
+const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm", "updatedAt", "arquivadaEm"];
 
 function toPlain(value: unknown): unknown {
   if (value instanceof Timestamp) return value.toDate();
