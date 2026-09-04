@@ -2,6 +2,7 @@
 
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey } from "@/lib/firestore";
+import { requireUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 function todayDateOnly() {
@@ -67,29 +68,36 @@ export async function marcarTodasPresentes(disciplinaIds: string[]) {
   revalidatePath("/historico");
 }
 
+/** Anotação rápida do Início — pessoal do login que escreveu; só aparece pros colegas se marcar "compartilhar". */
 export async function anotarRapido(disciplinaId: string, formData: FormData) {
+  const user = await requireUser();
+
   const resumo = String(formData.get("resumo") || "").trim();
   const anotacoesLousa = String(formData.get("anotacoesLousa") || "").trim();
+  const compartilhado = formData.get("compartilhado") === "on";
   if (!resumo && !anotacoesLousa) return;
 
   const hoje = todayDateOnly();
   const id = `${disciplinaId}_${dateOnlyKey(hoje)}`;
-  const ref = db.collection("aulas").doc(id);
-  const doc = await ref.get();
 
-  if (doc.exists) {
-    await ref.update({ resumo: resumo || null, anotacoesLousa: anotacoesLousa || null });
-  } else {
-    await ref.set({
-      disciplinaId,
-      data: hoje,
-      tema: `Aula de ${new Intl.DateTimeFormat("pt-BR").format(hoje)}`,
-      resumo: resumo || null,
-      anotacoesLousa: anotacoesLousa || null,
-      resumoIA: null,
-      createdAt: new Date(),
-    });
-  }
+  await garantirAulaDoDia(disciplinaId, hoje);
+
+  await db
+    .collection("aulas")
+    .doc(id)
+    .collection("anotacoes")
+    .doc(user.uid)
+    .set(
+      {
+        uid: user.uid,
+        nome: user.nome || user.email || "Colega",
+        resumo: resumo || null,
+        anotacoesLousa: anotacoesLousa || null,
+        compartilhado,
+        updatedAt: new Date(),
+      },
+      { merge: true }
+    );
 
   revalidatePath("/");
   revalidatePath("/aulas");

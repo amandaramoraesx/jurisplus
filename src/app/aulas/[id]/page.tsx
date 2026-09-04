@@ -2,9 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
+import { requireUser } from "@/lib/auth";
+import { buscarMinhaAnotacao, buscarNotasCompartilhadas, textoCompartilhadoParaIA } from "@/lib/anotacoes";
 import {
   updateAula,
   deleteAula,
+  salvarAnotacaoPessoal,
   gerarResumoIA,
   gerarQuizAula,
   adicionarAnexoAula,
@@ -23,14 +26,17 @@ export default async function AulaDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await requireUser();
   const { id } = await params;
   const aulaDoc = await db.collection("aulas").doc(id).get();
   if (!aulaDoc.exists) notFound();
   const aulaBase = fromDoc<Aula>(aulaDoc);
 
-  const [disciplinaDoc, favoritosSnap] = await Promise.all([
+  const [disciplinaDoc, favoritosSnap, minhaAnotacao, notasCompartilhadas] = await Promise.all([
     db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
     db.collection("vademecum_favoritos").where("aulaId", "==", id).get(),
+    buscarMinhaAnotacao(id, user.uid),
+    buscarNotasCompartilhadas(id),
   ]);
 
   if (!disciplinaDoc.exists) notFound();
@@ -41,7 +47,10 @@ export default async function AulaDetailPage({
     favoritosVadeMecum: favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc)),
   };
 
-  const temConteudo = Boolean(aula.resumo || aula.anotacoesLousa || aula.resumoIA);
+  const notasDosColegas = notasCompartilhadas.filter((nota) => nota.uid !== user.uid);
+  const temLegado = Boolean(aula.resumo || aula.anotacoesLousa);
+  const temConteudoCompartilhado = temLegado || notasDosColegas.length > 0 || Boolean(aula.resumoIA);
+  const textoParaCards = aula.resumoIA || textoCompartilhadoParaIA(aula, notasCompartilhadas);
 
   return (
     <div className="flex flex-col gap-6">
@@ -56,29 +65,40 @@ export default async function AulaDetailPage({
       </div>
 
       <section className="card">
-        {!temConteudo ? (
+        {!temConteudoCompartilhado ? (
           <p className="text-sm text-foreground/60">
-            Ainda não tem anotação nem lousa registrada nessa aula.
+            Ainda não tem anotação compartilhada nessa aula. Suas anotações pessoais ficam logo
+            abaixo, só visíveis pra você até você marcar &ldquo;compartilhar&rdquo;.
           </p>
         ) : (
-          <details className="disclosure">
+          <details className="disclosure" open>
             <summary className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Ver anotações</h2>
+              <h2 className="font-semibold">👥 Anotações compartilhadas</h2>
               <span className="btn-ghost shrink-0">Abrir</span>
             </summary>
             <div className="flex flex-col gap-4 mt-4">
-              {aula.resumo && (
+              {temLegado && (
                 <div>
-                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">Anotações</h3>
-                  <p className="text-sm whitespace-pre-wrap">{aula.resumo}</p>
+                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
+                    Anotação (registrada antes de virar por login)
+                  </h3>
+                  {aula.resumo && <p className="text-sm whitespace-pre-wrap">{aula.resumo}</p>}
+                  {aula.anotacoesLousa && (
+                    <p className="text-sm whitespace-pre-wrap font-mono mt-1">{aula.anotacoesLousa}</p>
+                  )}
                 </div>
               )}
-              {aula.anotacoesLousa && (
-                <div>
-                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">Lousa</h3>
-                  <p className="text-sm whitespace-pre-wrap font-mono">{aula.anotacoesLousa}</p>
+              {notasDosColegas.map((nota) => (
+                <div key={nota.id}>
+                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
+                    🌐 {nota.nome}
+                  </h3>
+                  {nota.resumo && <p className="text-sm whitespace-pre-wrap">{nota.resumo}</p>}
+                  {nota.anotacoesLousa && (
+                    <p className="text-sm whitespace-pre-wrap font-mono mt-1">{nota.anotacoesLousa}</p>
+                  )}
                 </div>
-              )}
+              ))}
               {aula.resumoIA && (
                 <div>
                   <h3 className="text-xs font-semibold text-foreground/60 mb-1">
@@ -95,8 +115,62 @@ export default async function AulaDetailPage({
         )}
       </section>
 
+      <details className="disclosure card" open>
+        <summary className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-sm text-foreground/70">📝 Minhas anotações</h2>
+          <span
+            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ${
+              minhaAnotacao?.compartilhado
+                ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
+                : "bg-black/5 dark:bg-white/10 text-foreground/50"
+            }`}
+          >
+            {minhaAnotacao?.compartilhado ? "🌐 compartilhada" : "🔒 só sua"}
+          </span>
+        </summary>
+        <form action={salvarAnotacaoPessoal.bind(null, aula.id)} className="flex flex-col gap-3 mt-3">
+          <p className="text-xs text-foreground/50">
+            Só você vê essas anotações, a não ser que marque a opção de compartilhar com os colegas.
+          </p>
+          <label className="text-xs font-medium text-foreground/60">
+            Anotações
+            <textarea
+              name="resumo"
+              defaultValue={minhaAnotacao?.resumo ?? ""}
+              rows={6}
+              placeholder="Escreva aqui suas anotações sobre a aula..."
+              className="mt-1 w-full field"
+            />
+          </label>
+          <label className="text-xs font-medium text-foreground/60">
+            Lousa
+            <textarea
+              name="anotacoesLousa"
+              defaultValue={minhaAnotacao?.anotacoesLousa ?? ""}
+              rows={6}
+              placeholder="Copie aqui o que o professor escreveu na lousa..."
+              className="mt-1 w-full field font-mono"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs text-foreground/70">
+            <input
+              type="checkbox"
+              name="compartilhado"
+              defaultChecked={minhaAnotacao?.compartilhado ?? false}
+              className="accent-[var(--accent)]"
+            />
+            🌐 Compartilhar essa anotação com os colegas (senão só você vê)
+          </label>
+          <div className="flex gap-3">
+            <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando...">
+              Salvar
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
+
       <details className="disclosure card">
-        <summary className="text-foreground/70 font-medium">✏️ Editar anotações</summary>
+        <summary className="text-foreground/70 font-medium">✏️ Editar tema/data da aula</summary>
         <form
           action={updateAula.bind(null, aula.id)}
           className="flex flex-col gap-3 mt-3"
@@ -117,26 +191,6 @@ export default async function AulaDetailPage({
               type="date"
               defaultValue={aula.data.toISOString().slice(0, 10)}
               className="mt-1 w-full field"
-            />
-          </label>
-          <label className="text-xs font-medium text-foreground/60">
-            Anotações
-            <textarea
-              name="resumo"
-              defaultValue={aula.resumo ?? ""}
-              rows={6}
-              placeholder="Escreva aqui suas anotações sobre a aula..."
-              className="mt-1 w-full field"
-            />
-          </label>
-          <label className="text-xs font-medium text-foreground/60">
-            Lousa
-            <textarea
-              name="anotacoesLousa"
-              defaultValue={aula.anotacoesLousa ?? ""}
-              rows={6}
-              placeholder="Copie aqui o que o professor escreveu na lousa..."
-              className="mt-1 w-full field font-mono"
             />
           </label>
           <div className="flex gap-3">
@@ -223,24 +277,25 @@ export default async function AulaDetailPage({
             <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
           ) : (
             <p className="text-xs text-foreground/50">
-              Preencha as anotações ou a lousa e clique em &ldquo;Gerar
-              resumo&rdquo; para ter uma síntese pronta para revisão.
+              Compartilhe suas anotações (ou peça pra um colega compartilhar as dele) e clique em
+              &ldquo;Gerar resumo&rdquo; para ter uma síntese pronta para revisão. Anotações
+              privadas de colegas nunca entram nesse resumo.
             </p>
           )}
         </div>
       </details>
 
-      <details className="disclosure card" open={Boolean(aula.resumoIA || aula.resumo)}>
+      <details className="disclosure card" open={Boolean(textoParaCards)}>
         <summary className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-sm text-foreground/70">🗂️ Resumo em cards</h2>
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="mt-3">
-          {aula.resumoIA || aula.resumo ? (
-            <ResumoCards texto={aula.resumoIA || aula.resumo || ""} />
+          {textoParaCards ? (
+            <ResumoCards texto={textoParaCards} />
           ) : (
             <p className="text-xs text-foreground/50">
-              Preencha as anotações (ou gere o resumo inteligente) para ver aqui um resumo em
+              Compartilhe anotações (ou gere o resumo inteligente) para ver aqui um resumo em
               cards, rápido de revisar antes da prova.
             </p>
           )}
@@ -253,7 +308,7 @@ export default async function AulaDetailPage({
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="flex flex-col gap-3 mt-3">
-          {isIAConfigured() && (aula.resumo || aula.anotacoesLousa) && (
+          {isIAConfigured() && temConteudoCompartilhado && (
             <form action={gerarQuizAula.bind(null, aula.id)}>
               <button
                 type="submit"
@@ -269,7 +324,7 @@ export default async function AulaDetailPage({
             <QuizPlayer perguntas={aula.quizIA} />
           ) : (
             <p className="text-xs text-foreground/50">
-              Preencha as anotações ou a lousa e clique em &ldquo;Gerar quiz&rdquo; para treinar essa aula.
+              Compartilhe anotações e clique em &ldquo;Gerar quiz&rdquo; para treinar essa aula.
             </p>
           )}
         </div>

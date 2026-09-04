@@ -20,6 +20,7 @@ import { createProfessor, updateProfessor, deleteProfessor } from "@/app/profess
 import { createProva, updateProva, deleteProva } from "@/app/provas/actions";
 import { addNota, updateNota, deleteNota } from "@/app/notas/actions";
 import { requireUser } from "@/lib/auth";
+import { buscarNotasCompartilhadasEmLote, textoCompartilhadoParaIA } from "@/lib/anotacoes";
 import { isIAConfigured } from "@/lib/anthropic";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
@@ -57,11 +58,17 @@ export default async function AcademicoPage({
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
   const professoresPorId = new Map(professores.map((p) => [p.id, p]));
 
-  const aulasPorDisciplina = new Map<string, Aula[]>();
-  for (const doc of aulasSnap.docs) {
-    const aula = fromDoc<Aula>(doc);
+  // Conteúdo compartilhado de cada aula (legado + notas marcadas como "compartilhar") — nunca
+  // inclui anotação privada de ninguém. É o mesmo conjunto que alimenta o quiz por IA, então
+  // "tem conteúdo pra estudar" e "dá pra gerar quiz" usam exatamente a mesma fonte.
+  const aulasRaw = aulasSnap.docs.map((doc) => fromDoc<Aula>(doc));
+  const notasCompartilhadasPorAula = await buscarNotasCompartilhadasEmLote(aulasRaw.map((a) => a.id));
+
+  const aulasPorDisciplina = new Map<string, (Aula & { conteudoCompartilhado: string })[]>();
+  for (const aula of aulasRaw) {
+    const conteudoCompartilhado = textoCompartilhadoParaIA(aula, notasCompartilhadasPorAula.get(aula.id) ?? []);
     const lista = aulasPorDisciplina.get(aula.disciplinaId) || [];
-    lista.push(aula);
+    lista.push({ ...aula, conteudoCompartilhado });
     aulasPorDisciplina.set(aula.disciplinaId, lista);
   }
 
@@ -262,13 +269,10 @@ export default async function AcademicoPage({
                         className="field"
                       />
                     </div>
-                    <textarea name="resumo" placeholder="Resumo da aula" rows={2} className="field" />
-                    <textarea
-                      name="anotacoesLousa"
-                      placeholder="Anotações da lousa"
-                      rows={2}
-                      className="field"
-                    />
+                    <p className="text-xs text-foreground/50">
+                      As anotações são por login — depois de criar, abra a aula pra escrever as suas
+                      (e escolher se quer compartilhar com os colegas).
+                    </p>
                     <button type="submit" className="self-start btn-primary">
                       Salvar aula
                     </button>
@@ -298,7 +302,7 @@ export default async function AcademicoPage({
                       <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
                     ) : (
                       <>
-                        {disciplina.aulas.some((a) => a.resumo || a.anotacoesLousa) && (
+                        {disciplina.aulas.some((a) => a.conteudoCompartilhado) && (
                           <form action={gerarQuizDisciplina.bind(null, disciplina.id)}>
                             <button
                               type="submit"
@@ -467,7 +471,7 @@ export default async function AcademicoPage({
             {provas.length === 0 && <p className="text-sm text-foreground/60">Nenhuma prova marcada ainda.</p>}
             {provas.map((prova) => {
               const dias = diasRestantes(prova.data);
-              const aulasComResumo = prova.disciplina.aulas.filter((a) => a.resumo || a.anotacoesLousa);
+              const aulasComResumo = prova.disciplina.aulas.filter((a) => a.conteudoCompartilhado);
               return (
                 <div key={prova.id} className="card flex flex-col gap-3">
                   <div className="flex items-start justify-between">
@@ -506,9 +510,9 @@ export default async function AcademicoPage({
                       {aulasComResumo.map((aula) => (
                         <li key={aula.id} className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2">
                           <p className="font-medium text-xs">{aula.tema}</p>
-                          {aula.resumo && (
-                            <p className="text-xs text-foreground/60 mt-1 line-clamp-3">{aula.resumo}</p>
-                          )}
+                          <p className="text-xs text-foreground/60 mt-1 line-clamp-3">
+                            {aula.conteudoCompartilhado}
+                          </p>
                         </li>
                       ))}
                     </ul>

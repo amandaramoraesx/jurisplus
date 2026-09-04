@@ -45,12 +45,28 @@ export type Aula = {
   disciplinaId: string;
   data: Date;
   tema: string;
+  /** @deprecated Anotação global de antes das anotações virarem por login. Só leitura; ver subcoleção "anotacoes". */
   resumo: string | null;
+  /** @deprecated Lousa global de antes das anotações virarem por login. Só leitura; ver subcoleção "anotacoes". */
   anotacoesLousa: string | null;
   resumoIA: string | null;
   createdAt: Date;
   quizIA?: QuizPergunta[] | null;
   anexos?: Anexo[];
+};
+
+/**
+ * Anotação pessoal de um login numa aula (subcoleção `aulas/{aulaId}/anotacoes/{uid}`).
+ * Por padrão é privada (só quem escreveu vê); só aparece pros colegas quando `compartilhado` é true.
+ */
+export type AnotacaoPessoal = {
+  id: string;
+  uid: string;
+  nome: string;
+  resumo: string | null;
+  anotacoesLousa: string | null;
+  compartilhado: boolean;
+  updatedAt: Date;
 };
 
 export type Presenca = {
@@ -133,7 +149,7 @@ export type LembreteEnviado = {
   enviadoEm: Date;
 };
 
-const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm"];
+const DATE_KEYS = ["data", "createdAt", "enviadoEm", "quizIAGeradoEm", "updatedAt"];
 
 function toPlain(value: unknown): unknown {
   if (value instanceof Timestamp) return value.toDate();
