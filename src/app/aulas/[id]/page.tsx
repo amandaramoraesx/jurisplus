@@ -309,7 +309,13 @@ export default async function AulaDetailPage({
         </summary>
         <div className="mt-3">
           {textoParaCards ? (
-            <ResumoCards texto={textoParaCards} />
+            <>
+              <p className="text-xs text-foreground/50 mb-3">
+                Um ponto-chave por vez, bem simples: arraste pro lado no celular ou use as setas
+                pra passar de card em card.
+              </p>
+              <ResumoCards texto={textoParaCards} />
+            </>
           ) : (
             <p className="text-xs text-foreground/50">
               Compartilhe anotações (ou gere o resumo inteligente) para ver aqui um resumo em

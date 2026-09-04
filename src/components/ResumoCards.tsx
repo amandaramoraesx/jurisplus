@@ -1,11 +1,17 @@
+"use client";
+
+import { useRef, useState } from "react";
+
 const ICONES = ["📘", "🔑", "⚖️", "📌", "💡", "🧩", "🗂️", "✨", "📎", "🎯"];
 
+// Fundo sólido e colorido (tipo cartão/pôster), não só um tom leve — pra ficar visual de verdade.
 const CORES = [
-  "bg-blue-600/10 text-blue-700 dark:text-blue-400 border-blue-600/20",
-  "bg-purple-600/10 text-purple-700 dark:text-purple-400 border-purple-600/20",
-  "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-  "bg-green-600/10 text-green-700 dark:text-green-400 border-green-600/20",
-  "bg-red-600/10 text-red-600 dark:text-red-400 border-red-600/20",
+  "bg-blue-600",
+  "bg-purple-600",
+  "bg-amber-500",
+  "bg-green-600",
+  "bg-rose-600",
+  "bg-teal-600",
 ];
 
 /** Quebra o resumo (IA ou anotação livre) em tópicos curtos pra virar cards. */
@@ -30,21 +36,61 @@ function dividirEmTopicos(texto: string): string[] {
     .slice(0, 12);
 }
 
+/** Resumo em formato de flashcard: um ponto por vez, grande e colorido — arrasta ou usa as setas. */
 export function ResumoCards({ texto }: { texto: string }) {
   const topicos = dividirEmTopicos(texto);
+  const [indice, setIndice] = useState(0);
+  const inicioToque = useRef<number | null>(null);
+
   if (topicos.length === 0) return null;
 
+  const ultimo = topicos.length - 1;
+  const anterior = () => setIndice((i) => Math.max(0, i - 1));
+  const proximo = () => setIndice((i) => Math.min(ultimo, i + 1));
+
+  function aoTocar(e: React.TouchEvent) {
+    inicioToque.current = e.touches[0].clientX;
+  }
+  function aoSoltarToque(e: React.TouchEvent) {
+    if (inicioToque.current === null) return;
+    const delta = e.changedTouches[0].clientX - inicioToque.current;
+    if (delta > 50) anterior();
+    else if (delta < -50) proximo();
+    inicioToque.current = null;
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {topicos.map((topico, i) => (
-        <div
-          key={i}
-          className={`rounded-xl border p-3 flex gap-2.5 items-start ${CORES[i % CORES.length]}`}
+    <div className="flex flex-col items-center gap-3">
+      <div
+        onTouchStart={aoTocar}
+        onTouchEnd={aoSoltarToque}
+        className={`w-full min-h-[190px] rounded-2xl p-6 flex flex-col items-center justify-center text-center gap-3 text-white transition-colors ${CORES[indice % CORES.length]}`}
+      >
+        <span className="text-4xl leading-none">{ICONES[indice % ICONES.length]}</span>
+        <p className="text-base font-medium leading-relaxed">{topicos[indice]}</p>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={anterior}
+          disabled={indice === 0}
+          className="btn-ghost disabled:opacity-30"
         >
-          <span className="text-xl leading-none shrink-0">{ICONES[i % ICONES.length]}</span>
-          <p className="text-sm">{topico}</p>
-        </div>
-      ))}
+          ← Anterior
+        </button>
+        <span className="text-xs text-foreground/50 tabular-nums">
+          {indice + 1} / {topicos.length}
+        </span>
+        <button
+          type="button"
+          onClick={proximo}
+          disabled={indice === ultimo}
+          className="btn-ghost disabled:opacity-30"
+        >
+          Próximo →
+        </button>
+      </div>
     </div>
   );
 }
