@@ -18,6 +18,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ResumoCards } from "@/components/ResumoCards";
+import { ShareButton } from "@/components/ShareButton";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,15 @@ export default async function AulaDetailPage({
   const temConteudoCompartilhado = temLegado || notasDosColegas.length > 0 || Boolean(aula.resumoIA);
   const textoParaCards = aula.resumoIA || textoCompartilhadoParaIA(aula, notasCompartilhadas);
 
+  const textoParaCompartilhar = [
+    `${aula.disciplina.nome} — ${aula.tema}`,
+    [aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n") || null,
+    minhaAnotacao ? [minhaAnotacao.resumo, minhaAnotacao.anotacoesLousa].filter(Boolean).join("\n") : null,
+    ...notasDosColegas.map((nota) => [nota.resumo, nota.anotacoesLousa].filter(Boolean).join("\n")),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -62,6 +72,16 @@ export default async function AulaDetailPage({
           ← {aula.disciplina.nome}
         </Link>
         <h1 className="text-2xl font-bold mt-1">{aula.tema}</h1>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary">
+          🖨️ Ver / Salvar em PDF
+        </Link>
+        <ShareButton title={aula.tema} text={textoParaCompartilhar} className="btn-primary" />
+        <a href="#minhas-anotacoes" className="btn-ghost">
+          ✏️ Editar minhas anotações
+        </a>
       </div>
 
       <section className="card">
@@ -107,15 +127,12 @@ export default async function AulaDetailPage({
                   <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
                 </div>
               )}
-              <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary self-start">
-                🖨️ Salvar em PDF / Imprimir
-              </Link>
             </div>
           </details>
         )}
       </section>
 
-      <details className="disclosure card" open>
+      <details id="minhas-anotacoes" className="disclosure card" open>
         <summary className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-sm text-foreground/70">📝 Minhas anotações</h2>
           <span
