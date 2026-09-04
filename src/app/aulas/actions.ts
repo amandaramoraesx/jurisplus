@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { db, storage } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getAnthropicClient, gerarQuizComIA } from "@/lib/anthropic";
+import { getAnthropicClient, gerarQuizComIA, gerarMapaMentalComIA } from "@/lib/anthropic";
 import { requireAdmin, requireUser } from "@/lib/auth";
 import { dateOnlyKey, type Anexo } from "@/lib/firestore";
 import {
@@ -383,6 +383,22 @@ export async function gerarQuizAula(aulaId: string) {
   const quizIA = await gerarQuizComIA(`a aula "${aula.tema}"`, conteudo, 5);
 
   await db.collection("aulas").doc(aulaId).update({ quizIA });
+
+  revalidatePath(`/aulas/${aulaId}`);
+}
+
+export async function gerarMapaMentalAula(aulaId: string) {
+  const aulaDoc = await db.collection("aulas").doc(aulaId).get();
+  const aula = aulaDoc.data();
+  if (!aula) throw new Error("Aula não encontrada");
+
+  const compartilhadas = await buscarNotasCompartilhadas(aulaId);
+  const conteudo = textoCompartilhadoParaIA(aula, compartilhadas);
+  if (!conteudo) return;
+
+  const mapaMental = await gerarMapaMentalComIA(`a aula "${aula.tema}"`, conteudo);
+
+  await db.collection("aulas").doc(aulaId).update({ mapaMental, mapaMentalGeradoEm: new Date() });
 
   revalidatePath(`/aulas/${aulaId}`);
 }
