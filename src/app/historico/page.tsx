@@ -4,23 +4,13 @@ import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor, type 
 import { requireUser } from "@/lib/auth";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ShareButton } from "@/components/ShareButton";
+import { DataSelo } from "@/components/DataSelo";
 
 export const dynamic = "force-dynamic";
 
 // Datas de aula ficam salvas como meia-noite UTC; formatar em UTC evita mostrar o dia anterior.
 function formatDate(d: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
-}
-
-function diaEMes(d: Date) {
-  const dia = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", timeZone: "UTC" }).format(d);
-  const mes = new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "UTC" })
-    .format(d)
-    .replace(".", "");
-  const semana = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "UTC" })
-    .format(d)
-    .replace(".", "");
-  return { dia, mes, semana };
 }
 
 type AulaComNotasVisiveis = Aula & {
@@ -84,7 +74,6 @@ function Autor({
 }
 
 function NotaCard({ aula, uid }: { aula: AulaComNotasVisiveis; uid: string }) {
-  const { dia, mes, semana } = diaEMes(aula.data);
   const minha = aula.notasVisiveis.find((nota) => nota.uid === uid);
   const dosColegas = aula.notasVisiveis.filter((nota) => nota.uid !== uid);
   const temLegado = Boolean(aula.resumo || aula.anotacoesLousa);
@@ -94,11 +83,7 @@ function NotaCard({ aula, uid }: { aula: AulaComNotasVisiveis; uid: string }) {
   return (
     <details className="disclosure rounded-xl border border-black/10 dark:border-white/10 bg-[var(--surface)]">
       <summary className="p-3 gap-3">
-        <span className="flex flex-col items-center justify-center w-12 shrink-0 rounded-lg bg-[var(--accent-soft)] text-[var(--accent)] py-1">
-          <span className="text-[10px] uppercase leading-none">{semana}</span>
-          <span className="text-lg font-bold leading-tight">{dia}</span>
-          <span className="text-[10px] uppercase leading-none">{mes}</span>
-        </span>
+        <DataSelo data={aula.data} />
         <span className="min-w-0 flex-1">
           <span className="font-semibold text-sm block truncate">
             {aula.disciplina?.nome ?? "Disciplina removida"}
