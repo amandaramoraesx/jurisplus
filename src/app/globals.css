@@ -347,6 +347,32 @@ body {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+/* Histórico: etiquetas e leitura da lousa */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+}
+
+.lousa-leitura {
+  border-radius: 0.7rem;
+  background: #1f3a32;
+  color: #eef5ee;
+  padding: 0.75rem 0.9rem;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 @media print {
   aside,
   nav,
