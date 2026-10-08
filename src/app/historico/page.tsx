@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor, type AnotacaoPessoal } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
-import { buscarAulasDoUsuario, buscarMinhasAnotacoesEmLote } from "@/lib/anotacoes";
+import { buscarAulasDoUsuario, buscarCompartilhadasComigoEmLote, buscarMinhasAnotacoesEmLote } from "@/lib/anotacoes";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ShareButton } from "@/components/ShareButton";
 import { DataSelo } from "@/components/DataSelo";
@@ -14,11 +14,12 @@ function formatDate(d: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
-/** Aula + o caderno do próprio login nela (ninguém vê o de ninguém). */
+/** Aula + o caderno do próprio login + o que colegas escolheram compartilhar com ele. */
 type AulaComCaderno = Aula & {
   disciplina: Disciplina | null;
   professor: Professor | null;
-  minha: AnotacaoPessoal;
+  minha: AnotacaoPessoal | null;
+  recebidas: AnotacaoPessoal[];
 };
 
 function BlocoTexto({ resumo, lousa }: { resumo: string | null; lousa: string | null }) {
@@ -58,8 +59,8 @@ function Autor({
 }
 
 function NotaCard({ aula }: { aula: AulaComCaderno }) {
-  const { minha } = aula;
-  const anexos = minha.anexos ?? [];
+  const { minha, recebidas } = aula;
+  const anexos = minha?.anexos ?? [];
   const totalAnexos = anexos.length;
 
   return (
@@ -72,26 +73,35 @@ function NotaCard({ aula }: { aula: AulaComCaderno }) {
           </span>
           <span className="text-xs text-foreground/60 block truncate">{aula.tema}</span>
           <span className="flex flex-wrap gap-1.5 mt-1">
-            {minha.resumo && <span className="chip">📝 anotação</span>}
-            {minha.anotacoesLousa && <span className="chip">🧑‍🏫 lousa</span>}
+            {minha?.resumo && <span className="chip">📝 anotação</span>}
+            {minha?.anotacoesLousa && <span className="chip">🧑‍🏫 lousa</span>}
+            {minha?.compartilhadoCom?.length ? <span className="chip">👥 compartilhada</span> : null}
+            {recebidas.length > 0 && (
+              <span className="chip">📥 de {recebidas.map((n) => n.nome.split(" ")[0]).join(", ")}</span>
+            )}
             {totalAnexos > 0 && (
               <span className="chip">
                 📎 {totalAnexos} {totalAnexos === 1 ? "anexo" : "anexos"}
               </span>
             )}
-            {minha.resumoIA && <span className="chip">✨ resumo IA</span>}
+            {minha?.resumoIA && <span className="chip">✨ resumo IA</span>}
           </span>
         </span>
       </summary>
 
       <div className="flex flex-col gap-2 px-3 pb-3">
         {aula.professor && <p className="text-xs text-foreground/50">Professor(a): {aula.professor.nome}</p>}
-        {(minha.resumo || minha.anotacoesLousa) && (
+        {minha && (minha.resumo || minha.anotacoesLousa) && (
           <Autor titulo="🔒 Minha anotação" abrir>
             <BlocoTexto resumo={minha.resumo} lousa={minha.anotacoesLousa} />
           </Autor>
         )}
-        {minha.resumoIA && (
+        {recebidas.map((nota) => (
+          <Autor key={nota.id} titulo={`📥 Compartilhado por ${nota.nome}`} abrir={!minha}>
+            <BlocoTexto resumo={nota.resumo} lousa={nota.anotacoesLousa} />
+          </Autor>
+        ))}
+        {minha?.resumoIA && (
           <Autor titulo="✨ Resumo inteligente (IA)">
             <p className="text-sm leading-relaxed whitespace-pre-wrap">{minha.resumoIA}</p>
           </Autor>
@@ -165,12 +175,18 @@ export default async function HistoricoPage({
     : [];
 
   async function comMeuCaderno(lista: typeof aulasBase): Promise<AulaComCaderno[]> {
-    const cadernos = await buscarMinhasAnotacoesEmLote(lista.map((a) => a.id), user.uid);
+    const ids = lista.map((a) => a.id);
+    const [cadernos, recebidasPorAula] = await Promise.all([
+      buscarMinhasAnotacoesEmLote(ids, user.uid),
+      buscarCompartilhadasComigoEmLote(ids, user.uid),
+    ]);
     return lista.flatMap((aula) => {
-      const minha = cadernos.get(aula.id);
+      const minha = cadernos.get(aula.id) ?? null;
+      const recebidas = recebidasPorAula.get(aula.id) ?? [];
       const temConteudo =
-        minha && (minha.resumo || minha.anotacoesLousa || minha.anexos?.length || minha.resumoIA);
-      return temConteudo ? [{ ...aula, minha }] : [];
+        (minha && (minha.resumo || minha.anotacoesLousa || minha.anexos?.length || minha.resumoIA)) ||
+        recebidas.length > 0;
+      return temConteudo ? [{ ...aula, minha, recebidas }] : [];
     });
   }
 
@@ -184,7 +200,8 @@ export default async function HistoricoPage({
       <div>
         <h1 className="text-2xl font-bold">🗓️ Histórico de aulas</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque suas anotações e lousas por data ou por professor. Só você vê o que está aqui.
+          Busque suas anotações e lousas por data ou por professor — e o que colegas compartilharam
+          com você.
         </p>
       </div>
 

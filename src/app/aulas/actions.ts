@@ -14,21 +14,25 @@ import {
   buscarMinhasAnotacoesEmLote,
   buscarAulasDoUsuario,
   garantirAulaDoDia,
+  atualizarLeitores,
   participaDaAula,
+  participarDaAula,
+  podeVerAula,
   textoDaAnotacao,
 } from "@/lib/anotacoes";
+import { lerCompartilhadoCom } from "@/lib/colegas";
 
 /** Caderno pessoal do login na aula (anotações, anexos, IA). */
 function refMeuCaderno(aulaId: string, uid: string) {
   return db.collection("aulas").doc(aulaId).collection("anotacoes").doc(uid);
 }
 
-/** Lê a aula e garante que o login participa dela (senão, pra ele, a aula não existe). */
+/** Lê a aula e garante que o login pode vê-la (participa ou recebeu compartilhamento). */
 async function minhaAula(aulaId: string, uid: string): Promise<Aula> {
   const doc = await db.collection("aulas").doc(aulaId).get();
   if (!doc.exists) throw new Error("Aula não encontrada");
   const aula = fromDoc<Aula>(doc);
-  if (!participaDaAula(aula, uid)) throw new Error("Aula não encontrada");
+  if (!podeVerAula(aula, uid)) throw new Error("Aula não encontrada");
   return aula;
 }
 
@@ -250,13 +254,14 @@ export async function updateAula(aulaId: string, formData: FormData) {
   revalidatePath("/historico");
 }
 
-/** Anotação pessoal do login atual numa aula — só ele vê. */
+/** Anotação pessoal do login atual numa aula — só ele vê, mais os colegas que ele escolher. */
 export async function salvarAnotacaoPessoal(aulaId: string, formData: FormData) {
   const user = await requireUser();
-  await minhaAula(aulaId, user.uid);
+  const aula = await minhaAula(aulaId, user.uid);
 
   const resumo = String(formData.get("resumo") || "").trim();
   const anotacoesLousa = String(formData.get("anotacoesLousa") || "").trim();
+  const compartilhadoCom = await lerCompartilhadoCom(formData, user.uid);
 
   await refMeuCaderno(aulaId, user.uid).set(
     {
@@ -264,10 +269,14 @@ export async function salvarAnotacaoPessoal(aulaId: string, formData: FormData) 
       nome: user.nome || user.email || "Colega",
       resumo: resumo || null,
       anotacoesLousa: anotacoesLousa || null,
+      compartilhadoCom,
       updatedAt: new Date(),
     },
     { merge: true }
   );
+  // Quem só recebeu a aula e começa a anotar passa a participar dela.
+  if (!participaDaAula(aula, user.uid)) await participarDaAula(aulaId, user.uid);
+  await atualizarLeitores(aulaId);
 
   revalidatePath("/");
   revalidatePath("/aulas");
@@ -293,16 +302,27 @@ export async function deleteAula(aulaId: string, disciplinaId: string) {
     )
   );
 
+  // Quem tinha recebido a aula compartilhada também sai da lista de quem pode ler.
+  const recebidasSnap = await db
+    .collection("aulas")
+    .doc(aulaId)
+    .collection("anotacoes")
+    .where("compartilhadoCom", "array-contains", user.uid)
+    .get();
+
   const restantes = (aula.participantes ?? []).filter((uid) => uid !== user.uid);
   const batch = db.batch();
   for (const doc of favoritosSnap.docs) batch.update(doc.ref, { aulaId: null });
+  for (const doc of recebidasSnap.docs) batch.update(doc.ref, { compartilhadoCom: FieldValue.arrayRemove(user.uid) });
   batch.delete(refMeuCaderno(aulaId, user.uid));
-  if (restantes.length === 0) {
+  const apagarAula = restantes.length === 0;
+  if (apagarAula) {
     batch.delete(db.collection("aulas").doc(aulaId));
   } else {
     batch.update(db.collection("aulas").doc(aulaId), { participantes: FieldValue.arrayRemove(user.uid) });
   }
   await batch.commit();
+  if (!apagarAula) await atualizarLeitores(aulaId);
 
   revalidatePath("/aulas");
   revalidatePath("/historico");

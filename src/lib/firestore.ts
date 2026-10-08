@@ -73,12 +73,14 @@ export type Aula = {
   anexos?: Anexo[];
   /** Logins que participam da aula (check-in, anotação ou criação): só eles veem a aula nas listas. */
   participantes?: string[];
+  /** Logins com quem alguém compartilhou a anotação desta aula (união dos `compartilhadoCom`). */
+  leitores?: string[];
 };
 
 /**
  * Caderno pessoal de um login numa aula (subcoleção `aulas/{aulaId}/anotacoes/{uid}`): anotações,
- * lousa, anexos e tudo que a IA gerou a partir delas. Só o dono vê — não existe compartilhamento
- * dentro do app (pra mandar pra alguém, usa o PDF).
+ * lousa, anexos e tudo que a IA gerou a partir delas. Só o dono vê — a não ser a anotação e a
+ * lousa, que ele pode compartilhar com colegas escolhidos (`compartilhadoCom`).
  */
 export type AnotacaoPessoal = {
   id: string;
@@ -87,6 +89,8 @@ export type AnotacaoPessoal = {
   resumo: string | null;
   anotacoesLousa: string | null;
   updatedAt: Date;
+  /** uids dos colegas que podem ler a anotação e a lousa (só leitura). */
+  compartilhadoCom?: string[];
   resumoIA?: string | null;
   quizIA?: QuizPergunta[] | null;
   mapaMental?: MapaMental | null;

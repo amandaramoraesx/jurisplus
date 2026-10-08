@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/firebase-admin";
 import { hojeNoBrasil } from "@/lib/firestore";
-import { garantirAulaDoDia } from "@/lib/anotacoes";
+import { atualizarLeitores, garantirAulaDoDia } from "@/lib/anotacoes";
+import { lerCompartilhadoCom } from "@/lib/colegas";
 import { requireUser } from "@/lib/auth";
 import { idPresenca } from "@/lib/dono";
 import { revalidatePath } from "next/cache";
@@ -47,7 +48,7 @@ export async function marcarTodasPresentes(disciplinaIds: string[]) {
   revalidatePath("/historico");
 }
 
-/** Anotação rápida do Início — só quem escreveu vê. */
+/** Anotação rápida do Início — só quem escreveu vê, mais os colegas que ele escolher. */
 export async function anotarRapido(disciplinaId: string, formData: FormData) {
   const user = await requireUser();
 
@@ -68,10 +69,12 @@ export async function anotarRapido(disciplinaId: string, formData: FormData) {
         nome: user.nome || user.email || "Colega",
         resumo: resumo || null,
         anotacoesLousa: anotacoesLousa || null,
+        compartilhadoCom: await lerCompartilhadoCom(formData, user.uid),
         updatedAt: new Date(),
       },
       { merge: true }
     );
+  await atualizarLeitores(id);
 
   revalidatePath("/");
   revalidatePath("/aulas");
