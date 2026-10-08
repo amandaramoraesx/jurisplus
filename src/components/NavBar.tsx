@@ -7,8 +7,8 @@ import { useState } from "react";
 const links = [
   { href: "/", label: "Início", icon: "🏠" },
   { href: "/aulas", label: "Acadêmico", icon: "🎓" },
-  { href: "/historico", label: "Histórico", icon: "🗓️" },
-  { href: "/palestras", label: "Palestras", icon: "🎤" },
+  { href: "/historico", label: "Histórico de aulas", icon: "🗓️" },
+  { href: "/palestras", label: "Palestras e horas complementares", icon: "🎤" },
   { href: "/grupos", label: "Grupos", icon: "👥" },
   { href: "/vademecum", label: "Vade Mecum", icon: "⚖️" },
 ];
@@ -58,7 +58,7 @@ export function NavBar({ isAdmin, loggedIn }: { isAdmin: boolean; loggedIn: bool
               <span aria-hidden className="text-lg">
                 {link.icon}
               </span>
-              {link.label}
+              <span className="leading-tight">{link.label}</span>
             </Link>
           ))}
         </nav>
@@ -118,7 +118,7 @@ export function NavBar({ isAdmin, loggedIn }: { isAdmin: boolean; loggedIn: bool
                 <span aria-hidden className="text-xl">
                   {link.icon}
                 </span>
-                {link.label}
+                <span className="leading-tight">{link.label}</span>
               </Link>
             ))}
           </div>

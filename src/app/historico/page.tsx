@@ -148,7 +148,7 @@ export default async function HistoricoPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold">🗓️ Histórico de anotações</h1>
+        <h1 className="text-2xl font-bold">🗓️ Histórico de aulas</h1>
         <p className="text-sm text-foreground/60 mt-1">
           Busque as anotações e lousas já registradas por data ou por professor — mostra suas
           anotações e as que os colegas compartilharam.
