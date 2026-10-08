@@ -1,8 +1,9 @@
 import { db } from "@/lib/firebase-admin";
-import { fromDoc, type Aula, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
+import { fromDoc, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
 import { criarArtigo, favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
 import { VademecumSearchBar } from "@/components/VademecumSearchBar";
 import { requireUser } from "@/lib/auth";
+import { buscarAulasDoUsuario } from "@/lib/anotacoes";
 
 export const dynamic = "force-dynamic";
 
@@ -21,20 +22,17 @@ export default async function VadeMecumPage({
   const { q } = await searchParams;
   const termo = (q || "").trim();
 
-  const [artigosSnap, favoritosSnap, aulasSnap, disciplinasSnap] = await Promise.all([
+  const [artigosSnap, favoritosSnap, minhasAulas, disciplinasSnap] = await Promise.all([
     termo ? db.collection("vademecum_artigos").get() : Promise.resolve(null),
     db.collection("vademecum_favoritos").where("uid", "==", user.uid).get(),
-    db.collection("aulas").orderBy("data", "desc").get(),
+    buscarAulasDoUsuario(user.uid),
     db.collection("disciplinas").get(),
   ]);
 
   const disciplinasPorId = new Map(
     disciplinasSnap.docs.map((doc) => [doc.id, fromDoc<Disciplina>(doc)])
   );
-  const aulas = aulasSnap.docs.map((doc) => {
-    const aula = fromDoc<Aula>(doc);
-    return { ...aula, disciplina: disciplinasPorId.get(aula.disciplinaId)! };
-  });
+  const aulas = minhasAulas.map((aula) => ({ ...aula, disciplina: disciplinasPorId.get(aula.disciplinaId)! }));
 
   const resultados = artigosSnap
     ? artigosSnap.docs

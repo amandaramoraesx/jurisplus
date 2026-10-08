@@ -3,7 +3,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
-import { buscarMinhaAnotacao, buscarNotasCompartilhadas, textoCompartilhadoParaIA } from "@/lib/anotacoes";
+import { buscarMinhaAnotacao, participaDaAula, textoDaAnotacao } from "@/lib/anotacoes";
 import {
   updateAula,
   deleteAula,
@@ -35,13 +35,14 @@ export default async function AulaDetailPage({
   const aulaDoc = await db.collection("aulas").doc(id).get();
   if (!aulaDoc.exists) notFound();
   const aulaBase = fromDoc<Aula>(aulaDoc);
+  // Cada login só enxerga as aulas de que participa.
+  if (!participaDaAula(aulaBase, user.uid)) notFound();
 
-  const [disciplinaDoc, favoritosSnap, minhaAnotacao, notasCompartilhadas] = await Promise.all([
+  const [disciplinaDoc, favoritosSnap, minhaAnotacao] = await Promise.all([
     db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
     // Favoritos do Vade Mecum são de cada um.
     db.collection("vademecum_favoritos").where("aulaId", "==", id).where("uid", "==", user.uid).get(),
     buscarMinhaAnotacao(id, user.uid),
-    buscarNotasCompartilhadas(id),
   ]);
 
   if (!disciplinaDoc.exists) notFound();
@@ -52,10 +53,14 @@ export default async function AulaDetailPage({
     favoritosVadeMecum: favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc)),
   };
 
-  const notasDosColegas = notasCompartilhadas.filter((nota) => nota.uid !== user.uid);
-  const temLegado = Boolean(aula.resumo || aula.anotacoesLousa);
-  const temConteudoCompartilhado = temLegado || notasDosColegas.length > 0 || Boolean(aula.resumoIA);
-  const textoParaCards = aula.resumoIA || textoCompartilhadoParaIA(aula, notasCompartilhadas);
+  // Tudo abaixo vem do caderno pessoal do login — ninguém vê o de ninguém.
+  const meuTexto = textoDaAnotacao(minhaAnotacao);
+  const temConteudo = Boolean(meuTexto);
+  const resumoIA = minhaAnotacao?.resumoIA ?? null;
+  const quizIA = minhaAnotacao?.quizIA ?? null;
+  const mapaMental = minhaAnotacao?.mapaMental ?? null;
+  const anexos = minhaAnotacao?.anexos ?? [];
+  const textoParaCards = resumoIA || meuTexto;
 
   return (
     <div className="flex flex-col gap-6">
@@ -86,65 +91,14 @@ export default async function AulaDetailPage({
             <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
             Minhas anotações
           </h2>
-          <span className="text-xs text-foreground/50 text-right">
-            Só você vê, a não ser que ative &ldquo;compartilhar&rdquo;.
-          </span>
+          <span className="text-xs text-foreground/50 text-right">🔒 Só você vê</span>
         </div>
         <EditorAnotacao
           action={salvarAnotacaoPessoal.bind(null, aula.id)}
           resumoInicial={minhaAnotacao?.resumo ?? ""}
           lousaInicial={minhaAnotacao?.anotacoesLousa ?? ""}
-          compartilhadoInicial={minhaAnotacao?.compartilhado ?? false}
           titulo={`${aula.disciplina.nome} — ${aula.tema}`}
         />
-      </section>
-
-      <section className="card">
-        {!temConteudoCompartilhado ? (
-          <p className="text-sm text-foreground/60">
-            Ainda não tem anotação compartilhada nessa aula. Suas anotações pessoais ficam logo
-            abaixo, só visíveis pra você até você marcar &ldquo;compartilhar&rdquo;.
-          </p>
-        ) : (
-          <details className="disclosure" open>
-            <summary className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">👥 Anotações dos colegas</h2>
-              <span className="btn-ghost shrink-0">Abrir</span>
-            </summary>
-            <div className="flex flex-col gap-4 mt-4">
-              {temLegado && (
-                <div>
-                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
-                    Anotação (registrada antes de virar por login)
-                  </h3>
-                  {aula.resumo && <p className="text-sm whitespace-pre-wrap">{aula.resumo}</p>}
-                  {aula.anotacoesLousa && (
-                    <p className="text-sm whitespace-pre-wrap font-mono mt-1">{aula.anotacoesLousa}</p>
-                  )}
-                </div>
-              )}
-              {notasDosColegas.map((nota) => (
-                <div key={nota.id}>
-                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
-                    🌐 {nota.nome}
-                  </h3>
-                  {nota.resumo && <p className="text-sm whitespace-pre-wrap">{nota.resumo}</p>}
-                  {nota.anotacoesLousa && (
-                    <p className="text-sm whitespace-pre-wrap font-mono mt-1">{nota.anotacoesLousa}</p>
-                  )}
-                </div>
-              ))}
-              {aula.resumoIA && (
-                <div>
-                  <h3 className="text-xs font-semibold text-foreground/60 mb-1">
-                    ✨ Resumo inteligente (IA)
-                  </h3>
-                  <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
-                </div>
-              )}
-            </div>
-          </details>
-        )}
       </section>
 
       <details className="disclosure card">
@@ -177,17 +131,17 @@ export default async function AulaDetailPage({
         </form>
       </details>
 
-      <details className="disclosure card" open={Boolean(aula.anexos?.length)}>
+      <details className="disclosure card" open={anexos.length > 0}>
         <summary className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-sm text-foreground/70">
-            📎 Anexos {aula.anexos?.length ? `(${aula.anexos.length})` : ""}
+            📎 Anexos {anexos.length ? `(${anexos.length})` : ""}
           </h2>
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="flex flex-col gap-3 mt-3">
-          {aula.anexos && aula.anexos.length > 0 && (
+          {anexos.length > 0 && (
             <ul className="flex flex-col gap-2">
-              {aula.anexos.map((anexo) => (
+              {anexos.map((anexo) => (
                 <li
                   key={anexo.id}
                   className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 p-2"
@@ -204,7 +158,7 @@ export default async function AulaDetailPage({
                       {formatBytes(anexo.tamanho)}
                     </span>
                   </a>
-                  <form action={removerAnexoAula.bind(null, aula.id, anexo.id, anexo.storagePath)}>
+                  <form action={removerAnexoAula.bind(null, aula.id, anexo.id)}>
                     <button type="submit" className="text-xs text-foreground/40 hover:text-red-600 shrink-0">
                       Remover
                     </button>
@@ -237,13 +191,13 @@ export default async function AulaDetailPage({
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="flex flex-col gap-3 mt-3">
-          {isIAConfigured() && (
+          {isIAConfigured() && temConteudo && (
             <form action={gerarResumoIA.bind(null, aula.id)}>
               <button
                 type="submit"
                 className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
               >
-                {aula.resumoIA ? "Gerar novamente" : "Gerar resumo"}
+                {resumoIA ? "Gerar novamente" : "Gerar resumo"}
               </button>
             </form>
           )}
@@ -251,13 +205,12 @@ export default async function AulaDetailPage({
             <p className="text-xs text-foreground/50">
               Recurso de IA ainda não configurado neste app.
             </p>
-          ) : aula.resumoIA ? (
-            <p className="text-sm whitespace-pre-wrap">{aula.resumoIA}</p>
+          ) : resumoIA ? (
+            <p className="text-sm whitespace-pre-wrap">{resumoIA}</p>
           ) : (
             <p className="text-xs text-foreground/50">
-              Compartilhe suas anotações (ou peça pra um colega compartilhar as dele) e clique em
-              &ldquo;Gerar resumo&rdquo; para ter uma síntese pronta para revisão. Anotações
-              privadas de colegas nunca entram nesse resumo.
+              Escreva suas anotações e clique em &ldquo;Gerar resumo&rdquo; para ter uma síntese
+              pronta para revisão. Usa só as suas anotações, e só você vê.
             </p>
           )}
         </div>
@@ -279,36 +232,36 @@ export default async function AulaDetailPage({
             </>
           ) : (
             <p className="text-xs text-foreground/50">
-              Compartilhe anotações (ou gere o resumo inteligente) para ver aqui um resumo em
+              Escreva suas anotações (ou gere o resumo inteligente) para ver aqui um resumo em
               cards, rápido de revisar antes da prova.
             </p>
           )}
         </div>
       </details>
 
-      <details className="disclosure card" open={Boolean(aula.mapaMental)}>
+      <details className="disclosure card" open={Boolean(mapaMental)}>
         <summary className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-sm text-foreground/70">🗺️ Mapa mental da aula</h2>
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="flex flex-col gap-3 mt-3">
-          {isIAConfigured() && temConteudoCompartilhado && (
+          {isIAConfigured() && temConteudo && (
             <form action={gerarMapaMentalAula.bind(null, aula.id)}>
               <button
                 type="submit"
                 className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
               >
-                {aula.mapaMental ? "Gerar outro mapa mental" : "Gerar mapa mental"}
+                {mapaMental ? "Gerar outro mapa mental" : "Gerar mapa mental"}
               </button>
             </form>
           )}
           {!isIAConfigured() ? (
             <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
-          ) : aula.mapaMental ? (
-            <MapaMental mapa={aula.mapaMental} />
+          ) : mapaMental ? (
+            <MapaMental mapa={mapaMental} />
           ) : (
             <p className="text-xs text-foreground/50">
-              Compartilhe anotações e clique em &ldquo;Gerar mapa mental&rdquo; pra organizar a
+              Escreva suas anotações e clique em &ldquo;Gerar mapa mental&rdquo; pra organizar a
               matéria em um infográfico por tópicos, tipo mapa mental.
             </p>
           )}
@@ -321,23 +274,23 @@ export default async function AulaDetailPage({
           <span className="btn-ghost shrink-0">Abrir</span>
         </summary>
         <div className="flex flex-col gap-3 mt-3">
-          {isIAConfigured() && temConteudoCompartilhado && (
+          {isIAConfigured() && temConteudo && (
             <form action={gerarQuizAula.bind(null, aula.id)}>
               <button
                 type="submit"
                 className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
               >
-                {aula.quizIA?.length ? "Gerar outro quiz" : "Gerar quiz"}
+                {quizIA?.length ? "Gerar outro quiz" : "Gerar quiz"}
               </button>
             </form>
           )}
           {!isIAConfigured() ? (
             <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
-          ) : aula.quizIA?.length ? (
-            <QuizPlayer perguntas={aula.quizIA} />
+          ) : quizIA?.length ? (
+            <QuizPlayer perguntas={quizIA} />
           ) : (
             <p className="text-xs text-foreground/50">
-              Compartilhe anotações e clique em &ldquo;Gerar quiz&rdquo; para treinar essa aula.
+              Escreva suas anotações e clique em &ldquo;Gerar quiz&rdquo; para treinar essa aula.
             </p>
           )}
         </div>
@@ -361,16 +314,14 @@ export default async function AulaDetailPage({
         </div>
       )}
 
-      {user.role === "admin" && (
-        <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
-          <button
-            type="submit"
-            className="btn-danger-text"
-          >
-            Remover esta aula
-          </button>
-        </form>
-      )}
+      <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
+        <button type="submit" className="btn-danger-text">
+          Remover esta aula da minha lista
+        </button>
+        <p className="text-xs text-foreground/45 mt-1">
+          Apaga suas anotações, anexos e conteúdo de IA desta aula. Não afeta os colegas.
+        </p>
+      </form>
     </div>
   );
 }

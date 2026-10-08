@@ -8,6 +8,7 @@ import {
   type Prova,
   type Nota,
   type Presenca,
+  type QuizPergunta,
   DIAS_SEMANA_ABREV,
   hojeNoBrasil,
   dateOnlyKey,
@@ -29,7 +30,7 @@ import { createProfessor, updateProfessor, deleteProfessor } from "@/app/profess
 import { createProva, updateProva, deleteProva } from "@/app/provas/actions";
 import { addNota, updateNota, deleteNota } from "@/app/notas/actions";
 import { requireUser } from "@/lib/auth";
-import { buscarNotasCompartilhadasEmLote, textoCompartilhadoParaIA } from "@/lib/anotacoes";
+import { buscarAulasDoUsuario, buscarMinhasAnotacoesEmLote, textoDaAnotacao } from "@/lib/anotacoes";
 import { isIAConfigured } from "@/lib/anthropic";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
@@ -42,7 +43,7 @@ function formatDate(d: Date) {
 
 const AULAS_VISIVEIS = 5;
 
-function AulaLinha({ aula }: { aula: Aula & { conteudoCompartilhado: string } }) {
+function AulaLinha({ aula }: { aula: Aula & { meuConteudo: string } }) {
   return (
     <Link
       href={`/aulas/${aula.id}`}
@@ -51,10 +52,10 @@ function AulaLinha({ aula }: { aula: Aula & { conteudoCompartilhado: string } })
       <DataSelo data={aula.data} />
       <span className="min-w-0 flex-1">
         <span className="text-sm font-medium block truncate">{aula.tema}</span>
-        {aula.conteudoCompartilhado ? (
-          <span className="text-[11px] text-green-700 dark:text-green-400">🌐 tem anotação compartilhada</span>
+        {aula.meuConteudo ? (
+          <span className="text-[11px] text-green-700 dark:text-green-400">📝 com anotação</span>
         ) : (
-          <span className="text-[11px] text-foreground/45">sem anotação compartilhada</span>
+          <span className="text-[11px] text-foreground/45">sem anotação</span>
         )}
       </span>
       <span aria-hidden className="text-foreground/40">›</span>
@@ -76,12 +77,13 @@ export default async function AcademicoPage({
   const isAdmin = user.role === "admin";
   const { abrir } = await searchParams;
 
-  const [disciplinasSnap, professoresSnap, aulasSnap, provasSnap, notasSnap, presencasSnap] = await Promise.all([
+  const [disciplinasSnap, professoresSnap, aulasRaw, provasSnap, notasSnap, presencasSnap] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").orderBy("nome", "asc").get(),
-    db.collection("aulas").orderBy("data", "desc").get(),
+    // Só as aulas de que esse login participa (check-in, anotação ou criou).
+    buscarAulasDoUsuario(user.uid),
     db.collection("provas").orderBy("data", "asc").get(),
-    // Frequência e notas são de cada um; disciplinas, aulas e provas são da turma.
+    // Frequência e notas são de cada um; disciplinas e provas são da turma.
     db.collection("notas").where("uid", "==", user.uid).get(),
     db.collection("presencas").where("uid", "==", user.uid).get(),
   ]);
@@ -100,17 +102,15 @@ export default async function AcademicoPage({
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
   const professoresPorId = new Map(professores.map((p) => [p.id, p]));
 
-  // Conteúdo compartilhado de cada aula (legado + notas marcadas como "compartilhar") — nunca
-  // inclui anotação privada de ninguém. É o mesmo conjunto que alimenta o quiz por IA, então
-  // "tem conteúdo pra estudar" e "dá pra gerar quiz" usam exatamente a mesma fonte.
-  const aulasRaw = aulasSnap.docs.map((doc) => fromDoc<Aula>(doc));
-  const notasCompartilhadasPorAula = await buscarNotasCompartilhadasEmLote(aulasRaw.map((a) => a.id));
+  // Conteúdo de cada aula = só as anotações do próprio login. É a mesma fonte do quiz por IA,
+  // então "tem conteúdo pra estudar" e "dá pra gerar quiz" batem.
+  const meusCadernos = await buscarMinhasAnotacoesEmLote(aulasRaw.map((a) => a.id), user.uid);
 
-  const aulasPorDisciplina = new Map<string, (Aula & { conteudoCompartilhado: string })[]>();
+  const aulasPorDisciplina = new Map<string, (Aula & { meuConteudo: string })[]>();
   for (const aula of aulasRaw) {
-    const conteudoCompartilhado = textoCompartilhadoParaIA(aula, notasCompartilhadasPorAula.get(aula.id) ?? []);
+    const meuConteudo = textoDaAnotacao(meusCadernos.get(aula.id));
     const lista = aulasPorDisciplina.get(aula.disciplinaId) || [];
-    lista.push({ ...aula, conteudoCompartilhado });
+    lista.push({ ...aula, meuConteudo });
     aulasPorDisciplina.set(aula.disciplinaId, lista);
   }
 
@@ -119,8 +119,16 @@ export default async function AcademicoPage({
   const disciplinasArquivadas = todasDisciplinas.filter((d) => d.arquivadaEm);
   const disciplinasPorId = new Map(todasDisciplinas.map((d) => [d.id, d]));
 
-  const disciplinas = disciplinasBase.map((disciplina) => ({
+  // Quiz de revisão da disciplina também é de cada um (disciplinas/{id}/quizzes/{uid}).
+  const meusQuizzes = disciplinasBase.length
+    ? await db.getAll(
+        ...disciplinasBase.map((d) => db.collection("disciplinas").doc(d.id).collection("quizzes").doc(user.uid))
+      )
+    : [];
+
+  const disciplinas = disciplinasBase.map((disciplina, i) => ({
     ...disciplina,
+    quizIA: (meusQuizzes[i]?.data()?.quizIA as QuizPergunta[] | undefined) ?? null,
     professor: disciplina.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null,
     aulas: aulasPorDisciplina.get(disciplina.id) || [],
     presencas: presencasPorDisciplina.get(disciplina.id) || [],
@@ -294,8 +302,8 @@ export default async function AcademicoPage({
                             />
                           </div>
                           <p className="text-xs text-foreground/50">
-                            As anotações são por login — depois de criar, abra a aula pra escrever as suas
-                            (e escolher se quer compartilhar com os colegas).
+                            A aula aparece só pra você — depois de criar, abra ela pra escrever suas
+                            anotações.
                           </p>
                           <button type="submit" className="self-start btn-primary">
                             Salvar aula
@@ -378,7 +386,7 @@ export default async function AcademicoPage({
                             <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
                           ) : (
                             <>
-                              {disciplina.aulas.some((a) => a.conteudoCompartilhado) && (
+                              {disciplina.aulas.some((a) => a.meuConteudo) && (
                                 <form action={gerarQuizDisciplina.bind(null, disciplina.id)}>
                                   <button
                                     type="submit"
@@ -655,7 +663,7 @@ export default async function AcademicoPage({
             {provas.length === 0 && <p className="text-sm text-foreground/60">Nenhuma prova marcada ainda.</p>}
             {provas.map((prova) => {
               const dias = diasRestantes(prova.data);
-              const aulasComResumo = prova.disciplina.aulas.filter((a) => a.conteudoCompartilhado);
+              const aulasComResumo = prova.disciplina.aulas.filter((a) => a.meuConteudo);
               return (
                 <div key={prova.id} className="card flex flex-col gap-3">
                   <div className="flex items-start justify-between">
@@ -688,14 +696,14 @@ export default async function AcademicoPage({
                     <ul className="flex flex-col gap-2 mt-2">
                       {aulasComResumo.length === 0 && (
                         <li className="text-xs text-foreground/50">
-                          Ainda não há resumos registrados para esta disciplina.
+                          Você ainda não tem anotações nesta disciplina.
                         </li>
                       )}
                       {aulasComResumo.map((aula) => (
                         <li key={aula.id} className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2">
                           <p className="font-medium text-xs">{aula.tema}</p>
                           <p className="text-xs text-foreground/60 mt-1 line-clamp-3">
-                            {aula.conteudoCompartilhado}
+                            {aula.meuConteudo}
                           </p>
                         </li>
                       ))}

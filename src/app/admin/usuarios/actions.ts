@@ -30,7 +30,7 @@ export async function removerUsuario(uid: string) {
   revalidatePath("/admin/usuarios");
 }
 
-/** Nome que aparece no "Oi, ..." da tela inicial e nas anotações compartilhadas. */
+/** Nome que aparece no "Oi, ..." da tela inicial e no PDF das anotações. */
 export async function renomearUsuario(uid: string, formData: FormData) {
   await requireAdmin();
   const nome = String(formData.get("nome") || "").trim();

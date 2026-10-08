@@ -19,14 +19,12 @@ export function EditorAnotacao({
   action,
   resumoInicial,
   lousaInicial,
-  compartilhadoInicial,
   titulo,
   rodapeExtra,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   resumoInicial: string;
   lousaInicial: string;
-  compartilhadoInicial: boolean;
   titulo?: string;
   rodapeExtra?: React.ReactNode;
 }) {
@@ -34,7 +32,6 @@ export function EditorAnotacao({
   // Controlados de propósito: o React reseta forms não controlados depois da action.
   const [resumo, setResumo] = useState(resumoInicial);
   const [lousa, setLousa] = useState(lousaInicial);
-  const [compartilhado, setCompartilhado] = useState(compartilhadoInicial);
   const [telaCheia, setTelaCheia] = useState(false);
   const [letraGrande, setLetraGrande] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -142,18 +139,7 @@ export function EditorAnotacao({
       </div>
 
       <div className="editor-rodape">
-        <label className="editor-switch">
-          <input
-            type="checkbox"
-            name="compartilhado"
-            checked={compartilhado}
-            onChange={(e) => setCompartilhado(e.target.checked)}
-          />
-          <span className="editor-switch-trilho" aria-hidden />
-          <span className="text-xs">
-            {compartilhado ? "🌐 Compartilhada com os colegas" : "🔒 Só você vê"}
-          </span>
-        </label>
+        <span className="text-xs text-foreground/60">🔒 Só você vê</span>
         <span className="text-[11px] text-foreground/45 hidden sm:inline">
           {contarPalavras(textoAtual)} palavras · Ctrl+S salva
         </span>

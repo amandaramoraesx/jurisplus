@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, fromDoc, type Aula, type Disciplina, type Professor, type AnotacaoPessoal } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
+import { buscarAulasDoUsuario, buscarMinhasAnotacoesEmLote } from "@/lib/anotacoes";
 import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ShareButton } from "@/components/ShareButton";
 import { DataSelo } from "@/components/DataSelo";
@@ -13,18 +14,12 @@ function formatDate(d: Date) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
-type AulaComNotasVisiveis = Aula & {
+/** Aula + o caderno do próprio login nela (ninguém vê o de ninguém). */
+type AulaComCaderno = Aula & {
   disciplina: Disciplina | null;
   professor: Professor | null;
-  notasVisiveis: AnotacaoPessoal[];
+  minha: AnotacaoPessoal;
 };
-
-async function anotacoesVisiveis(aulaId: string, uid: string): Promise<AnotacaoPessoal[]> {
-  const snap = await db.collection("aulas").doc(aulaId).collection("anotacoes").get();
-  return snap.docs
-    .map((doc) => fromDoc<AnotacaoPessoal>(doc))
-    .filter((nota) => nota.uid === uid || nota.compartilhado);
-}
 
 function BlocoTexto({ resumo, lousa }: { resumo: string | null; lousa: string | null }) {
   return (
@@ -62,12 +57,10 @@ function Autor({
   );
 }
 
-function NotaCard({ aula, uid }: { aula: AulaComNotasVisiveis; uid: string }) {
-  const minha = aula.notasVisiveis.find((nota) => nota.uid === uid);
-  const dosColegas = aula.notasVisiveis.filter((nota) => nota.uid !== uid);
-  const temLegado = Boolean(aula.resumo || aula.anotacoesLousa);
-  const totalAnotacoes = aula.notasVisiveis.length + (temLegado ? 1 : 0);
-  const totalAnexos = aula.anexos?.length ?? 0;
+function NotaCard({ aula }: { aula: AulaComCaderno }) {
+  const { minha } = aula;
+  const anexos = minha.anexos ?? [];
+  const totalAnexos = anexos.length;
 
   return (
     <details className="disclosure rounded-xl border border-black/10 dark:border-white/10 bg-[var(--surface)]">
@@ -79,42 +72,34 @@ function NotaCard({ aula, uid }: { aula: AulaComNotasVisiveis; uid: string }) {
           </span>
           <span className="text-xs text-foreground/60 block truncate">{aula.tema}</span>
           <span className="flex flex-wrap gap-1.5 mt-1">
-            {minha && <span className="chip">🔒 minha</span>}
-            {totalAnotacoes > 0 && (
-              <span className="chip">
-                📝 {totalAnotacoes} {totalAnotacoes === 1 ? "anotação" : "anotações"}
-              </span>
-            )}
+            {minha.resumo && <span className="chip">📝 anotação</span>}
+            {minha.anotacoesLousa && <span className="chip">🧑‍🏫 lousa</span>}
             {totalAnexos > 0 && (
               <span className="chip">
                 📎 {totalAnexos} {totalAnexos === 1 ? "anexo" : "anexos"}
               </span>
             )}
+            {minha.resumoIA && <span className="chip">✨ resumo IA</span>}
           </span>
         </span>
       </summary>
 
       <div className="flex flex-col gap-2 px-3 pb-3">
         {aula.professor && <p className="text-xs text-foreground/50">Professor(a): {aula.professor.nome}</p>}
-        {minha && (
-          <Autor titulo={minha.compartilhado ? "🌐 Minha anotação (compartilhada)" : "🔒 Minha anotação"} abrir>
+        {(minha.resumo || minha.anotacoesLousa) && (
+          <Autor titulo="🔒 Minha anotação" abrir>
             <BlocoTexto resumo={minha.resumo} lousa={minha.anotacoesLousa} />
           </Autor>
         )}
-        {dosColegas.map((nota) => (
-          <Autor key={nota.id} titulo={`🌐 ${nota.nome}`} abrir={!minha && dosColegas.length === 1}>
-            <BlocoTexto resumo={nota.resumo} lousa={nota.anotacoesLousa} />
-          </Autor>
-        ))}
-        {temLegado && (
-          <Autor titulo="🗂️ Anotação antiga da turma">
-            <BlocoTexto resumo={aula.resumo} lousa={aula.anotacoesLousa} />
+        {minha.resumoIA && (
+          <Autor titulo="✨ Resumo inteligente (IA)">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{minha.resumoIA}</p>
           </Autor>
         )}
         {totalAnexos > 0 && (
           <Autor titulo={`📎 Anexos (${totalAnexos})`}>
             <ul className="flex flex-col gap-1.5">
-              {aula.anexos!.map((anexo) => (
+              {anexos.map((anexo) => (
                 <li key={anexo.id}>
                   <a
                     href={`/api/anexos/${aula.id}/${anexo.id}`}
@@ -153,8 +138,8 @@ export default async function HistoricoPage({
   const user = await requireUser();
   const { data: dataSelecionada, professorId: professorIdSelecionado } = await searchParams;
 
-  const [aulasSnap, disciplinasSnap, professoresSnap] = await Promise.all([
-    db.collection("aulas").orderBy("data", "desc").get(),
+  const [minhasAulas, disciplinasSnap, professoresSnap] = await Promise.all([
+    buscarAulasDoUsuario(user.uid),
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").orderBy("nome", "asc").get(),
   ]);
@@ -164,8 +149,7 @@ export default async function HistoricoPage({
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
   const professoresPorId = new Map(professores.map((p) => [p.id, p]));
 
-  const aulasBase = aulasSnap.docs.map((doc) => {
-    const aula = fromDoc<Aula>(doc);
+  const aulasBase = minhasAulas.map((aula) => {
     const disciplina = disciplinasPorId.get(aula.disciplinaId) ?? null;
     const professor = disciplina?.professorId ? professoresPorId.get(disciplina.professorId) ?? null : null;
     return { ...aula, disciplina, professor };
@@ -180,19 +164,19 @@ export default async function HistoricoPage({
     ? aulasBase.filter((aula) => aula.professor?.id === professorIdSelecionado)
     : [];
 
-  async function comNotasVisiveis(lista: typeof aulasBase): Promise<AulaComNotasVisiveis[]> {
-    const notas = await Promise.all(lista.map((aula) => anotacoesVisiveis(aula.id, user.uid)));
-    return lista
-      .map((aula, i) => ({ ...aula, notasVisiveis: notas[i] }))
-      .filter(
-        (aula) =>
-          aula.resumo || aula.anotacoesLousa || aula.anexos?.length || aula.notasVisiveis.length > 0
-      );
+  async function comMeuCaderno(lista: typeof aulasBase): Promise<AulaComCaderno[]> {
+    const cadernos = await buscarMinhasAnotacoesEmLote(lista.map((a) => a.id), user.uid);
+    return lista.flatMap((aula) => {
+      const minha = cadernos.get(aula.id);
+      const temConteudo =
+        minha && (minha.resumo || minha.anotacoesLousa || minha.anexos?.length || minha.resumoIA);
+      return temConteudo ? [{ ...aula, minha }] : [];
+    });
   }
 
   const [aulasDoDia, aulasDoProfessor] = await Promise.all([
-    comNotasVisiveis(aulasDoDiaBase),
-    comNotasVisiveis(aulasDoProfessorBase),
+    comMeuCaderno(aulasDoDiaBase),
+    comMeuCaderno(aulasDoProfessorBase),
   ]);
 
   return (
@@ -200,8 +184,7 @@ export default async function HistoricoPage({
       <div>
         <h1 className="text-2xl font-bold">🗓️ Histórico de aulas</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Busque as anotações e lousas já registradas por data ou por professor — mostra suas
-          anotações e as que os colegas compartilharam.
+          Busque suas anotações e lousas por data ou por professor. Só você vê o que está aqui.
         </p>
       </div>
 
@@ -235,7 +218,7 @@ export default async function HistoricoPage({
                 </p>
               )}
               {aulasDoDia.map((aula) => (
-                <NotaCard key={aula.id} aula={aula} uid={user.uid} />
+                <NotaCard key={aula.id} aula={aula} />
               ))}
             </div>
           )}
@@ -290,7 +273,7 @@ export default async function HistoricoPage({
                 </p>
               )}
               {aulasDoProfessor.map((aula) => (
-                <NotaCard key={aula.id} aula={aula} uid={user.uid} />
+                <NotaCard key={aula.id} aula={aula} />
               ))}
             </div>
           )}
