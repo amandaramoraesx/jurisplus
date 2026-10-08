@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
-import { dateOnlyKey, fromDoc, type Disciplina, type Presenca, type Professor, DIAS_SEMANA } from "@/lib/firestore";
+import {
+  dateOnlyKey,
+  fromDoc,
+  hojeNoBrasil,
+  type Disciplina,
+  type Presenca,
+  type Professor,
+  DIAS_SEMANA,
+} from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
 import { buscarMinhaAnotacao } from "@/lib/anotacoes";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { EditorAnotacao } from "@/components/EditorAnotacao";
 
 export const dynamic = "force-dynamic";
-
-function todayDateOnly() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
 
 type DisciplinaComExtras = Disciplina & {
   professor: Professor | null;
@@ -20,7 +24,7 @@ type DisciplinaComExtras = Disciplina & {
   minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string; compartilhado: boolean };
 };
 
-function AnotarDisciplinaDetails({
+function AnotarDisciplina({
   disciplina,
   hojeKey,
   abrirPorPadrao,
@@ -33,72 +37,51 @@ function AnotarDisciplinaDetails({
   const temAnotacao = Boolean(resumo || anotacoesLousa);
 
   return (
-    <details className="disclosure" open={abrirPorPadrao}>
-      <summary className="rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm font-medium flex items-center justify-between gap-2">
-        <span>
-          {disciplina.nome}
-          {disciplina.professor ? (
-            <span className="text-foreground/50 font-normal"> · {disciplina.professor.nome}</span>
-          ) : null}
+    <details className="disclosure rounded-xl border border-black/10 dark:border-white/10" open={abrirPorPadrao}>
+      <summary className="px-4 py-3">
+        <span className="min-w-0">
+          <span className="font-semibold block truncate">{disciplina.nome}</span>
+          {(disciplina.professor || disciplina.horario) && (
+            <span className="text-xs text-foreground/50 block truncate">
+              {[disciplina.professor?.nome, disciplina.horario].filter(Boolean).join(" · ")}
+            </span>
+          )}
         </span>
         {temAnotacao && (
           <span
-            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ${
+            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ml-auto ${
               compartilhado
                 ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
                 : "bg-green-600/10 text-green-700 dark:text-green-400"
             }`}
           >
-            {compartilhado ? "🌐 compartilhada com colegas" : "🔒 anotação salva (só sua)"}
+            {compartilhado ? "🌐 compartilhada" : "🔒 salva"}
           </span>
         )}
       </summary>
-      <form action={anotarRapido.bind(null, disciplina.id)} className="flex flex-col gap-3 mt-2">
-        <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
-          Anotações
-          <textarea
-            name="resumo"
-            defaultValue={resumo}
-            rows={4}
-            placeholder="Suas anotações sobre a aula..."
-            className="field"
-          />
-        </label>
-        <label className="text-xs font-medium text-foreground/60 flex flex-col gap-1">
-          Lousa
-          <textarea
-            name="anotacoesLousa"
-            defaultValue={anotacoesLousa}
-            rows={4}
-            placeholder="O que o professor escreveu na lousa..."
-            className="field font-mono"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-xs text-foreground/70">
-          <input type="checkbox" name="compartilhado" defaultChecked={compartilhado} className="accent-[var(--accent)]" />
-          🌐 Compartilhar essa anotação com os colegas (senão só você vê)
-        </label>
-        <div className="flex items-center gap-3">
-          <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando..." className="self-start btn-primary">
-            💾 Salvar anotação
-          </SubmitButton>
-          {temAnotacao && (
-            <Link
-              href={`/aulas/${disciplina.id}_${hojeKey}`}
-              className="text-xs text-foreground/60 hover:underline"
-            >
-              🖨️ Ver aula e gerar PDF →
-            </Link>
-          )}
-        </div>
-      </form>
+      <div className="px-3 pb-3 sm:px-4 sm:pb-4">
+        <EditorAnotacao
+          action={anotarRapido.bind(null, disciplina.id)}
+          resumoInicial={resumo}
+          lousaInicial={anotacoesLousa}
+          compartilhadoInicial={compartilhado}
+          titulo={disciplina.nome}
+          rodapeExtra={
+            temAnotacao ? (
+              <Link href={`/aulas/${disciplina.id}_${hojeKey}`} className="text-xs text-foreground/60 hover:underline">
+                Abrir aula →
+              </Link>
+            ) : null
+          }
+        />
+      </div>
     </details>
   );
 }
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const hoje = todayDateOnly();
+  const hoje = hojeNoBrasil();
   const hojeKey = dateOnlyKey(hoje);
 
   const [disciplinasSnap, professoresSnap, aulasSnap, presencasSnap] = await Promise.all([
@@ -167,11 +150,11 @@ export default async function DashboardPage() {
     presencas.filter((p) => dateOnlyKey(p.data) === hojeKey).map((p) => [p.disciplinaId, p.presente])
   );
 
-  const hojeDiaSemana = hoje.getDay();
-  // Disciplina sem calendário definido ainda aparece sempre (não trava o check-in de ninguém).
-  const temHoje = (d: (typeof disciplinas)[number]) =>
-    !d.diasSemana || d.diasSemana.length === 0 || d.diasSemana.includes(hojeDiaSemana);
-  const disciplinasHoje = disciplinas.filter(temHoje);
+  const hojeDiaSemana = hoje.getUTCDay();
+  // Só entra no check-in quem tem aula hoje no calendário do semestre. Disciplina sem dia da
+  // semana cadastrado não aparece aqui (senão surgia todo dia); ganha só um aviso pra configurar.
+  const disciplinasHoje = disciplinas.filter((d) => d.diasSemana?.includes(hojeDiaSemana));
+  const disciplinasSemCalendario = disciplinas.filter((d) => !d.diasSemana || d.diasSemana.length === 0);
 
   const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
   const primeiroNome = (user.nome || user.email || "").split(" ")[0] || "";
@@ -184,7 +167,7 @@ export default async function DashboardPage() {
           👋 {primeiroNome ? `Oi, ${primeiroNome}!` : "Oi!"}
         </h1>
         <p className="text-sm opacity-85 mt-0.5">
-          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full" }).format(hoje)}
+          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "UTC" }).format(hoje)}
         </p>
         {disciplinasHoje.length > 0 && (
           <p className="text-sm mt-2 font-medium">
@@ -291,24 +274,36 @@ export default async function DashboardPage() {
         )}
       </section>
 
+      {disciplinasSemCalendario.length > 0 && (
+        <p className="text-xs text-foreground/60 rounded-xl border border-dashed border-black/15 dark:border-white/15 px-4 py-3">
+          🗓️ {disciplinasSemCalendario.map((d) => d.nome).join(", ")}{" "}
+          {disciplinasSemCalendario.length === 1 ? "está" : "estão"} sem dia da semana definido e não
+          {disciplinasSemCalendario.length === 1 ? " aparece" : " aparecem"} no check-in.{" "}
+          <Link href="/aulas?abrir=disciplinas" className="font-medium text-[var(--accent)] hover:underline">
+            Definir os dias de aula →
+          </Link>
+        </p>
+      )}
+
       {disciplinasHoje.length > 0 && (
-        <section className="card flex flex-col gap-3">
+        <section className="card flex flex-col gap-4">
           <div>
             <h2 className="font-semibold flex items-center gap-2">
               <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
-              Anotar aula
+              Anotar aula de hoje
             </h2>
-            <p className="text-xs text-foreground/60 mt-0.5">
-              Clique na matéria e escreva — fica salvo direto na aula de hoje.
+            <p className="text-xs text-foreground/60 mt-1">
+              Escolha a aba <strong>Anotações</strong> ou <strong>Lousa</strong> e escreva à vontade.
+              Use <strong>Tela cheia</strong> pra ter a tela toda durante a aula.
             </p>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {disciplinasHoje.map((disciplina) => (
-              <AnotarDisciplinaDetails
+              <AnotarDisciplina
                 key={disciplina.id}
                 disciplina={disciplina}
                 hojeKey={hojeKey}
-                abrirPorPadrao={disciplinasHoje.length <= 2}
+                abrirPorPadrao={disciplinasHoje.length === 1}
               />
             ))}
           </div>

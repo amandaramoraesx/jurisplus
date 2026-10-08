@@ -9,6 +9,7 @@ import {
   type Nota,
   type Presenca,
   DIAS_SEMANA_ABREV,
+  hojeNoBrasil,
 } from "@/lib/firestore";
 import {
   createDisciplina,
@@ -37,9 +38,7 @@ function formatDate(d: Date) {
 }
 
 function diasRestantes(data: Date) {
-  const hoje = new Date();
-  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-  const diffMs = data.getTime() - inicioHoje.getTime();
+  const diffMs = data.getTime() - hojeNoBrasil().getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 

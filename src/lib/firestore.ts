@@ -215,3 +215,21 @@ export const DIAS_SEMANA = [
 ] as const;
 
 export const DIAS_SEMANA_ABREV = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+
+/**
+ * "Hoje" no fuso de Brasília, como meia-noite UTC daquele dia. O servidor roda em UTC, então
+ * `new Date()` vira o dia seguinte depois das 21h — e a aula da noite sumia/trocava de dia.
+ * Meia-noite UTC mantém `dateOnlyKey` e `getUTCDay` batendo com o dia do calendário do aluno.
+ */
+export function hojeNoBrasil(): Date {
+  const [ano, mes, dia] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .split("-")
+    .map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia));
+}

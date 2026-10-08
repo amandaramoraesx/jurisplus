@@ -191,6 +191,162 @@ body {
   transform: rotate(-135deg);
 }
 
+/* Editor de anotações / lousa */
+
+.editor-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.editor-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 60%, transparent);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editor-tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px rgba(28, 26, 23, 0.12);
+}
+
+.editor-tab-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: #16a34a;
+}
+
+.editor-tool {
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--foreground) 70%, transparent);
+  transition: background 0.15s ease;
+}
+
+.editor-tool:hover,
+.editor-tool[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.editor-area {
+  width: 100%;
+  min-height: 22rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  padding: 1rem 1.15rem;
+  resize: vertical;
+  field-sizing: content;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (min-width: 768px) {
+  .editor-area {
+    min-height: 26rem;
+  }
+}
+
+.editor-area:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.fixed .editor-area {
+  min-height: 0;
+  field-sizing: fixed;
+  resize: none;
+}
+
+/* Lousa com cara de quadro: fundo verde-escuro e "giz" claro, igual em claro e escuro. */
+.editor-lousa {
+  background: #1f3a32;
+  color: #eef5ee;
+  border-color: #2c4c42;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.editor-lousa::placeholder {
+  color: rgba(238, 245, 238, 0.45);
+}
+
+.editor-lousa:focus {
+  border-color: #6fbf9a;
+  box-shadow: 0 0 0 3px rgba(111, 191, 154, 0.25);
+}
+
+.editor-rodape {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.editor-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+  color: color-mix(in srgb, var(--foreground) 75%, transparent);
+}
+
+.editor-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.editor-switch-trilho {
+  position: relative;
+  width: 2.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 18%, transparent);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.editor-switch-trilho::after {
+  content: "";
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.editor-switch input:checked + .editor-switch-trilho {
+  background: var(--accent);
+}
+
+.editor-switch input:checked + .editor-switch-trilho::after {
+  transform: translateX(1rem);
+}
+
+.editor-switch input:focus-visible + .editor-switch-trilho {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 @media print {
   aside,
   nav,
