@@ -24,10 +24,10 @@ export default async function UsuariosPage() {
       <div>
         <h1 className="text-2xl font-bold">Usuários</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Crie logins pra colegas usarem o Juris+. Disciplinas, professores, aulas e provas são da
-          turma (só admin cadastra disciplinas e professores). Frequência, notas, palestras, grupos,
-          favoritos e anotações são de cada login — ninguém vê os do outro, a não ser anotações
-          marcadas como &ldquo;compartilhar&rdquo;.
+          Crie logins pra colegas usarem o Juris+. Disciplinas, professores e provas são da turma
+          (só admin cadastra disciplinas e professores). Todo o resto — aulas, anotações, lousa,
+          anexos, IA, frequência, notas, palestras, grupos e favoritos — é de cada login: ninguém vê
+          o do outro.
         </p>
       </div>
 

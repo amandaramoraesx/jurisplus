@@ -1,45 +1,79 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { db } from "@/lib/firebase-admin";
-import { fromDoc, type AnotacaoPessoal } from "@/lib/firestore";
+import { dateOnlyKey, fromDoc, type AnotacaoPessoal, type Aula } from "@/lib/firestore";
 
 function refAnotacoes(aulaId: string) {
   return db.collection("aulas").doc(aulaId).collection("anotacoes");
 }
 
-/** Notas pessoais marcadas como compartilhadas numa aula (visíveis pra qualquer colega). */
-export async function buscarNotasCompartilhadas(aulaId: string): Promise<AnotacaoPessoal[]> {
-  const snap = await refAnotacoes(aulaId).where("compartilhado", "==", true).get();
-  return snap.docs.map((doc) => fromDoc<AnotacaoPessoal>(doc));
-}
-
-/** Mesma coisa, em lote pra várias aulas (uma query por aula, em paralelo). */
-export async function buscarNotasCompartilhadasEmLote(
-  aulaIds: string[]
-): Promise<Map<string, AnotacaoPessoal[]>> {
-  const listas = await Promise.all(aulaIds.map((id) => buscarNotasCompartilhadas(id)));
-  return new Map(aulaIds.map((id, i) => [id, listas[i]]));
-}
-
-/** A anotação pessoal do próprio login numa aula (privada por padrão). */
+/** O caderno pessoal do login numa aula (anotações, lousa, anexos e IA). Só o dono lê. */
 export async function buscarMinhaAnotacao(aulaId: string, uid: string): Promise<AnotacaoPessoal | null> {
   const doc = await refAnotacoes(aulaId).doc(uid).get();
   return doc.exists ? fromDoc<AnotacaoPessoal>(doc) : null;
 }
 
+/** Mesma coisa pra várias aulas, numa leitura só. */
+export async function buscarMinhasAnotacoesEmLote(
+  aulaIds: string[],
+  uid: string
+): Promise<Map<string, AnotacaoPessoal>> {
+  if (aulaIds.length === 0) return new Map();
+  const docs = await db.getAll(...aulaIds.map((id) => refAnotacoes(id).doc(uid)));
+  const mapa = new Map<string, AnotacaoPessoal>();
+  docs.forEach((doc, i) => {
+    if (doc.exists) mapa.set(aulaIds[i], fromDoc<AnotacaoPessoal>(doc));
+  });
+  return mapa;
+}
+
+/** Texto da anotação + lousa, usado pra alimentar a IA e o "conteúdo sugerido" das provas. */
+export function textoDaAnotacao(nota: Pick<AnotacaoPessoal, "resumo" | "anotacoesLousa"> | null | undefined) {
+  return [nota?.resumo, nota?.anotacoesLousa].filter(Boolean).join("\n\n");
+}
+
 /**
- * Junta o que ficou gravado direto na aula (de antes das anotações virarem por login) com as
- * notas marcadas como compartilhadas, num texto único — usado pra alimentar a IA (resumo/quiz) e
- * o "conteúdo sugerido" das provas. Nunca inclui nota privada de ninguém.
+ * Aulas que aparecem pra esse login: só as que ele participa (fez check-in, anotou ou criou).
+ * Ordena em memória (array-contains + orderBy exigiria índice composto).
  */
-export function textoCompartilhadoParaIA(
-  aulaLegado: { resumo?: string | null; anotacoesLousa?: string | null },
-  compartilhadas: AnotacaoPessoal[]
-): string {
-  const partes: string[] = [];
-  if (aulaLegado.resumo) partes.push(aulaLegado.resumo);
-  if (aulaLegado.anotacoesLousa) partes.push(aulaLegado.anotacoesLousa);
-  for (const nota of compartilhadas) {
-    if (nota.resumo) partes.push(nota.resumo);
-    if (nota.anotacoesLousa) partes.push(nota.anotacoesLousa);
+export async function buscarAulasDoUsuario(uid: string, disciplinaId?: string): Promise<Aula[]> {
+  const snap = await db.collection("aulas").where("participantes", "array-contains", uid).get();
+  return snap.docs
+    .map((doc) => fromDoc<Aula>(doc))
+    .filter((aula) => !disciplinaId || aula.disciplinaId === disciplinaId)
+    .sort((a, b) => b.data.getTime() - a.data.getTime());
+}
+
+export function participaDaAula(aula: Pick<Aula, "participantes">, uid: string) {
+  return Boolean(aula.participantes?.includes(uid));
+}
+
+/** Marca o login como participante (a aula passa a aparecer nas listas dele). */
+export async function participarDaAula(aulaId: string, uid: string) {
+  await db.collection("aulas").doc(aulaId).update({ participantes: FieldValue.arrayUnion(uid) });
+}
+
+/**
+ * Garante que existe a aula do dia da disciplina (id determinístico) e que o login participa dela —
+ * check-in, frequência e anotação rápida usam isso.
+ */
+export async function garantirAulaDoDia(disciplinaId: string, data: Date, uid: string) {
+  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
+  const ref = db.collection("aulas").doc(id);
+  const doc = await ref.get();
+  if (doc.exists) {
+    if (!participaDaAula(doc.data() as Aula, uid)) await participarDaAula(id, uid);
+    return id;
   }
-  return partes.join("\n\n");
+
+  await ref.set({
+    disciplinaId,
+    data,
+    tema: `Aula de ${new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(data)}`,
+    resumo: null,
+    anotacoesLousa: null,
+    resumoIA: null,
+    participantes: [uid],
+    createdAt: new Date(),
+  });
+  return id;
 }

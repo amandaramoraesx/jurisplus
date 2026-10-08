@@ -21,7 +21,7 @@ type DisciplinaComExtras = Disciplina & {
   professor: Professor | null;
   totalAulas: number;
   presencas: Presenca[];
-  minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string; compartilhado: boolean };
+  minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string };
 };
 
 function AnotarDisciplina({
@@ -33,7 +33,7 @@ function AnotarDisciplina({
   hojeKey: string;
   abrirPorPadrao?: boolean;
 }) {
-  const { resumo, anotacoesLousa, compartilhado } = disciplina.minhaAnotacaoHoje;
+  const { resumo, anotacoesLousa } = disciplina.minhaAnotacaoHoje;
   const temAnotacao = Boolean(resumo || anotacoesLousa);
 
   return (
@@ -48,14 +48,8 @@ function AnotarDisciplina({
           )}
         </span>
         {temAnotacao && (
-          <span
-            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ml-auto ${
-              compartilhado
-                ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
-                : "bg-green-600/10 text-green-700 dark:text-green-400"
-            }`}
-          >
-            {compartilhado ? "🌐 compartilhada" : "🔒 salva"}
+          <span className="text-[10px] rounded-full px-2 py-0.5 shrink-0 ml-auto bg-green-600/10 text-green-700 dark:text-green-400">
+            🔒 salva
           </span>
         )}
       </summary>
@@ -64,7 +58,6 @@ function AnotarDisciplina({
           action={anotarRapido.bind(null, disciplina.id)}
           resumoInicial={resumo}
           lousaInicial={anotacoesLousa}
-          compartilhadoInicial={compartilhado}
           titulo={disciplina.nome}
           rodapeExtra={
             temAnotacao ? (
@@ -161,7 +154,8 @@ export default async function DashboardPage() {
   const [disciplinasSnap, professoresSnap, aulasSnap, presencasSnap] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").get(),
-    db.collection("aulas").get(),
+    // Só as aulas de que esse login participa.
+    db.collection("aulas").where("participantes", "array-contains", user.uid).get(),
     db.collection("presencas").where("uid", "==", user.uid).get(),
   ]);
 
@@ -191,7 +185,6 @@ export default async function DashboardPage() {
       {
         resumo: minhasAnotacoesHoje[i]?.resumo || "",
         anotacoesLousa: minhasAnotacoesHoje[i]?.anotacoesLousa || "",
-        compartilhado: minhasAnotacoesHoje[i]?.compartilhado || false,
       },
     ])
   );
@@ -216,7 +209,6 @@ export default async function DashboardPage() {
       minhaAnotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || {
         resumo: "",
         anotacoesLousa: "",
-        compartilhado: false,
       },
     }));
 

@@ -2,7 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/firebase-admin";
-import { migrarDadosSemDono } from "@/lib/dono";
+import { migrarDadosSemDono, migrarParaCadernoIndividual } from "@/lib/dono";
 
 export const SESSION_COOKIE = "juris_session";
 
@@ -42,6 +42,8 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     if (role === "admin") {
       await migrarDadosSemDono(user.uid).catch((e) => console.error("Migração de dono falhou", e));
     }
+    // Roda na primeira entrada de qualquer login (precisa da v1 já feita pra saber a dona).
+    await migrarParaCadernoIndividual(user).catch((e) => console.error("Migração individual falhou", e));
     return user;
   } catch {
     return null;

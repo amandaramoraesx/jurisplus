@@ -71,11 +71,14 @@ export type Aula = {
   mapaMental?: MapaMental | null;
   mapaMentalGeradoEm?: Date | null;
   anexos?: Anexo[];
+  /** Logins que participam da aula (check-in, anotação ou criação): só eles veem a aula nas listas. */
+  participantes?: string[];
 };
 
 /**
- * Anotação pessoal de um login numa aula (subcoleção `aulas/{aulaId}/anotacoes/{uid}`).
- * Por padrão é privada (só quem escreveu vê); só aparece pros colegas quando `compartilhado` é true.
+ * Caderno pessoal de um login numa aula (subcoleção `aulas/{aulaId}/anotacoes/{uid}`): anotações,
+ * lousa, anexos e tudo que a IA gerou a partir delas. Só o dono vê — não existe compartilhamento
+ * dentro do app (pra mandar pra alguém, usa o PDF).
  */
 export type AnotacaoPessoal = {
   id: string;
@@ -83,8 +86,12 @@ export type AnotacaoPessoal = {
   nome: string;
   resumo: string | null;
   anotacoesLousa: string | null;
-  compartilhado: boolean;
   updatedAt: Date;
+  resumoIA?: string | null;
+  quizIA?: QuizPergunta[] | null;
+  mapaMental?: MapaMental | null;
+  mapaMentalGeradoEm?: Date | null;
+  anexos?: Anexo[];
 };
 
 export type Presenca = {
