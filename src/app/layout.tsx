@@ -53,7 +53,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <NavBar isAdmin={user?.role === "admin"} loggedIn={!!user} />
         <div className="flex-1 min-w-0">
           <main
-            className={`px-4 pb-6 md:py-6 max-w-3xl mx-auto w-full ${user ? "pt-20 md:pt-6" : "pt-6"}`}
+            className={`px-4 pb-6 md:py-6 max-w-5xl mx-auto w-full ${user ? "pt-20 md:pt-6" : "pt-6"}`}
           >
             {children}
           </main>

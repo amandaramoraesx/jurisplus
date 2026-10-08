@@ -1,14 +1,10 @@
 "use server";
 
 import { db } from "@/lib/firebase-admin";
-import { dateOnlyKey } from "@/lib/firestore";
+import { dateOnlyKey, hojeNoBrasil } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
+import { idPresenca } from "@/lib/dono";
 import { revalidatePath } from "next/cache";
-
-function todayDateOnly() {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
 
 /** Garante que exista a aula "de hoje" da disciplina, pra check-in já vincular com a aula do dia. */
 async function garantirAulaDoDia(disciplinaId: string, data: Date) {
@@ -29,14 +25,14 @@ async function garantirAulaDoDia(disciplinaId: string, data: Date) {
 }
 
 export async function marcarPresenca(disciplinaId: string, presente: boolean) {
-  const data = todayDateOnly();
-  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
+  const user = await requireUser();
+  const data = hojeNoBrasil();
 
   await Promise.all([
     db
       .collection("presencas")
-      .doc(id)
-      .set({ disciplinaId, data, presente, createdAt: new Date() }, { merge: true }),
+      .doc(idPresenca(user.uid, disciplinaId, data))
+      .set({ uid: user.uid, disciplinaId, data, presente, createdAt: new Date() }, { merge: true }),
     garantirAulaDoDia(disciplinaId, data),
   ]);
 
@@ -46,14 +42,14 @@ export async function marcarPresenca(disciplinaId: string, presente: boolean) {
 }
 
 export async function marcarTodasPresentes(disciplinaIds: string[]) {
-  const data = todayDateOnly();
+  const user = await requireUser();
+  const data = hojeNoBrasil();
 
   const batch = db.batch();
   for (const disciplinaId of disciplinaIds) {
-    const id = `${disciplinaId}_${dateOnlyKey(data)}`;
     batch.set(
-      db.collection("presencas").doc(id),
-      { disciplinaId, data, presente: true, createdAt: new Date() },
+      db.collection("presencas").doc(idPresenca(user.uid, disciplinaId, data)),
+      { uid: user.uid, disciplinaId, data, presente: true, createdAt: new Date() },
       { merge: true }
     );
   }
@@ -77,7 +73,7 @@ export async function anotarRapido(disciplinaId: string, formData: FormData) {
   const compartilhado = formData.get("compartilhado") === "on";
   if (!resumo && !anotacoesLousa) return;
 
-  const hoje = todayDateOnly();
+  const hoje = hojeNoBrasil();
   const id = `${disciplinaId}_${dateOnlyKey(hoje)}`;
 
   await garantirAulaDoDia(disciplinaId, hoje);

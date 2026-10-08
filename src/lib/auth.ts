@@ -1,6 +1,8 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/firebase-admin";
+import { migrarDadosSemDono } from "@/lib/dono";
 
 export const SESSION_COOKIE = "juris_session";
 
@@ -13,7 +15,14 @@ export type SessionUser = {
   role: Role;
 };
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
+/** "maria.silva@x.com" → "Maria" — só pra quem ainda não tem nome cadastrado. */
+function nomeDoEmail(email: string | null) {
+  const base = email?.split("@")[0]?.split(/[._-]/)[0];
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : null;
+}
+
+// cache(): várias chamadas na mesma requisição (layout + página + actions) verificam uma vez só.
+export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sessionCookie) return null;
@@ -21,16 +30,23 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   try {
     const decoded = await auth.verifySessionCookie(sessionCookie, true);
     const role: Role = decoded.role === "admin" ? "admin" : "aluno";
-    return {
+    // O nome vem da conta (e não do cookie de login), pra troca de nome valer na hora.
+    const conta = await auth.getUser(decoded.uid).catch(() => null);
+    const email = conta?.email ?? decoded.email ?? null;
+    const user: SessionUser = {
       uid: decoded.uid,
-      email: decoded.email ?? null,
-      nome: (decoded.name as string | undefined) ?? null,
+      email,
+      nome: conta?.displayName || (decoded.name as string | undefined) || nomeDoEmail(email),
       role,
     };
+    if (role === "admin") {
+      await migrarDadosSemDono(user.uid).catch((e) => console.error("Migração de dono falhou", e));
+    }
+    return user;
   } catch {
     return null;
   }
-}
+});
 
 /** Usa dentro de páginas: redireciona para /login se ninguém estiver logado. */
 export async function requireUser(): Promise<SessionUser> {

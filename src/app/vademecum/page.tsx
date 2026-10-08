@@ -2,6 +2,7 @@ import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumArtigo, type VadeMecumFavorito } from "@/lib/firestore";
 import { criarArtigo, favoritarArtigo, vincularFavoritoAula, removeFavorito } from "./actions";
 import { VademecumSearchBar } from "@/components/VademecumSearchBar";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,12 +17,13 @@ export default async function VadeMecumPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
+  const user = await requireUser();
   const { q } = await searchParams;
   const termo = (q || "").trim();
 
   const [artigosSnap, favoritosSnap, aulasSnap, disciplinasSnap] = await Promise.all([
     termo ? db.collection("vademecum_artigos").get() : Promise.resolve(null),
-    db.collection("vademecum_favoritos").orderBy("createdAt", "desc").get(),
+    db.collection("vademecum_favoritos").where("uid", "==", user.uid).get(),
     db.collection("aulas").orderBy("data", "desc").get(),
     db.collection("disciplinas").get(),
   ]);
@@ -41,7 +43,9 @@ export default async function VadeMecumPage({
         .slice(0, 20)
     : [];
 
-  const favoritos = favoritosSnap.docs.map((doc) => fromDoc<VadeMecumFavorito>(doc));
+  const favoritos = favoritosSnap.docs
+    .map((doc) => fromDoc<VadeMecumFavorito>(doc))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
     <div className="flex flex-col gap-8">

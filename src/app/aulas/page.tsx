@@ -9,7 +9,11 @@ import {
   type Nota,
   type Presenca,
   DIAS_SEMANA_ABREV,
+  hojeNoBrasil,
+  dateOnlyKey,
 } from "@/lib/firestore";
+import { DataSelo } from "@/components/DataSelo";
+import { AbrirPorHash } from "@/components/AbrirPorHash";
 import {
   createDisciplina,
   updateDisciplina,
@@ -33,13 +37,33 @@ import { QuizPlayer } from "@/components/QuizPlayer";
 export const dynamic = "force-dynamic";
 
 function formatDate(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
+}
+
+const AULAS_VISIVEIS = 5;
+
+function AulaLinha({ aula }: { aula: Aula & { conteudoCompartilhado: string } }) {
+  return (
+    <Link
+      href={`/aulas/${aula.id}`}
+      className="flex items-center gap-3 rounded-lg border border-black/10 dark:border-white/10 p-2 pr-3 hover:bg-black/[.03] dark:hover:bg-white/[.05]"
+    >
+      <DataSelo data={aula.data} />
+      <span className="min-w-0 flex-1">
+        <span className="text-sm font-medium block truncate">{aula.tema}</span>
+        {aula.conteudoCompartilhado ? (
+          <span className="text-[11px] text-green-700 dark:text-green-400">🌐 tem anotação compartilhada</span>
+        ) : (
+          <span className="text-[11px] text-foreground/45">sem anotação compartilhada</span>
+        )}
+      </span>
+      <span aria-hidden className="text-foreground/40">›</span>
+    </Link>
+  );
 }
 
 function diasRestantes(data: Date) {
-  const hoje = new Date();
-  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-  const diffMs = data.getTime() - inicioHoje.getTime();
+  const diffMs = data.getTime() - hojeNoBrasil().getTime();
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
@@ -57,8 +81,9 @@ export default async function AcademicoPage({
     db.collection("professores").orderBy("nome", "asc").get(),
     db.collection("aulas").orderBy("data", "desc").get(),
     db.collection("provas").orderBy("data", "asc").get(),
-    db.collection("notas").get(),
-    db.collection("presencas").orderBy("data", "desc").get(),
+    // Frequência e notas são de cada um; disciplinas, aulas e provas são da turma.
+    db.collection("notas").where("uid", "==", user.uid).get(),
+    db.collection("presencas").where("uid", "==", user.uid).get(),
   ]);
 
   const presencasPorDisciplina = new Map<string, Presenca[]>();
@@ -67,6 +92,9 @@ export default async function AcademicoPage({
     const lista = presencasPorDisciplina.get(presenca.disciplinaId) || [];
     lista.push(presenca);
     presencasPorDisciplina.set(presenca.disciplinaId, lista);
+  }
+  for (const lista of presencasPorDisciplina.values()) {
+    lista.sort((a, b) => b.data.getTime() - a.data.getTime());
   }
 
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));
@@ -133,6 +161,7 @@ export default async function AcademicoPage({
 
   return (
     <div className="flex flex-col gap-6">
+      <AbrirPorHash />
       <h1 className="text-2xl font-bold">🎓 Acadêmico</h1>
 
       {/* ---------- Aulas e disciplinas ---------- */}
@@ -190,227 +219,256 @@ export default async function AcademicoPage({
               </p>
             )}
 
-            {disciplinas.map((disciplina) => (
-              <section key={disciplina.id} id={disciplina.id} className="card flex flex-col gap-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">{disciplina.nome}</h3>
-                    <p className="text-xs text-foreground/60">
-                      {disciplina.semestre}
-                      {disciplina.professor ? ` · ${disciplina.professor.nome}` : ""}
-                    </p>
-                    {disciplina.diasSemana && disciplina.diasSemana.length > 0 && (
-                      <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
-                        🗓️ {disciplina.diasSemana.map((d) => DIAS_SEMANA_ABREV[d]).join(", ")}
-                        {disciplina.horario ? ` · ${disciplina.horario}` : ""}
-                      </p>
-                    )}
-                  </div>
-                  {isAdmin && (
-                    <form action={arquivarDisciplina.bind(null, disciplina.id)}>
-                      <button type="submit" className="btn-danger-text">
-                        🗑️ Mandar pra lixeira
-                      </button>
-                    </form>
-                  )}
-                </div>
-
-                {isAdmin && (
-                  <details className="disclosure text-sm">
-                    <summary className="text-foreground/70 font-medium">Editar disciplina</summary>
-                    <form
-                      action={updateDisciplina.bind(null, disciplina.id)}
-                      className="flex flex-col gap-2 mt-3"
-                    >
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input name="nome" defaultValue={disciplina.nome} required className="flex-1 field" />
-                        <input
-                          name="semestre"
-                          defaultValue={disciplina.semestre}
-                          required
-                          className="w-40 field"
-                        />
-                      </div>
-                      <select name="professorId" defaultValue={disciplina.professorId ?? ""} className="field">
-                        <option value="">Sem professor vinculado</option>
-                        {professores.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nome}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-xs font-medium text-foreground/60">
-                          Dias da semana com aula (calendário fixo do semestre)
+            {disciplinas.map((disciplina) => {
+              const presentes = disciplina.presencas.filter((p) => p.presente).length;
+              const frequencia =
+                disciplina.presencas.length > 0 ? Math.round((presentes / disciplina.presencas.length) * 100) : null;
+              const aulasRecentes = disciplina.aulas.slice(0, AULAS_VISIVEIS);
+              const aulasAntigas = disciplina.aulas.slice(AULAS_VISIVEIS);
+              return (
+                <details
+                  key={disciplina.id}
+                  id={disciplina.id}
+                  className="disclosure rounded-xl border border-black/10 dark:border-white/10 bg-[var(--surface)] scroll-mt-24"
+                >
+                  <summary className="p-4 gap-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="font-semibold block truncate">{disciplina.nome}</span>
+                      <span className="text-xs text-foreground/60 block truncate">
+                        {[disciplina.semestre, disciplina.professor?.nome].filter(Boolean).join(" · ")}
+                      </span>
+                      <span className="flex flex-wrap gap-1.5 mt-1.5">
+                        {disciplina.diasSemana && disciplina.diasSemana.length > 0 ? (
+                          <span className="chip">
+                            🗓️ {disciplina.diasSemana.map((d) => DIAS_SEMANA_ABREV[d]).join(", ")}
+                            {disciplina.horario ? ` · ${disciplina.horario}` : ""}
+                          </span>
+                        ) : (
+                          <span className="chip">🗓️ sem dia definido</span>
+                        )}
+                        <span className="chip">
+                          📚 {disciplina.aulas.length} {disciplina.aulas.length === 1 ? "aula" : "aulas"}
                         </span>
-                        <div className="flex flex-wrap gap-3">
-                          {DIAS_SEMANA_ABREV.map((label, i) => (
-                            <label key={i} className="flex items-center gap-1.5 text-xs">
-                              <input
-                                type="checkbox"
-                                name="diasSemana"
-                                value={i}
-                                defaultChecked={disciplina.diasSemana?.includes(i)}
-                              />
-                              {label}
-                            </label>
+                        {frequencia !== null && <span className="chip">📊 {frequencia}% presença</span>}
+                      </span>
+                    </span>
+                  </summary>
+
+                  <div className="flex flex-col gap-2 px-4 pb-4">
+                    <p className="section-title mt-1">Aulas</p>
+                    {disciplina.aulas.length === 0 && (
+                      <p className="text-xs text-foreground/50">Nenhuma aula registrada ainda.</p>
+                    )}
+                    {aulasRecentes.map((aula) => (
+                      <AulaLinha key={aula.id} aula={aula} />
+                    ))}
+                    {aulasAntigas.length > 0 && (
+                      <details className="disclosure">
+                        <summary className="text-xs font-medium text-[var(--accent)] py-1">
+                          Ver aulas mais antigas ({aulasAntigas.length})
+                        </summary>
+                        <div className="flex flex-col gap-2 mt-2">
+                          {aulasAntigas.map((aula) => (
+                            <AulaLinha key={aula.id} aula={aula} />
                           ))}
                         </div>
-                      </div>
-                      <input
-                        name="horario"
-                        placeholder="Horário (opcional, ex: 19:10 às 22:00)"
-                        defaultValue={disciplina.horario ?? ""}
-                        className="field"
-                      />
-                      <button type="submit" className="self-start btn-primary">
-                        Salvar alterações
-                      </button>
-                    </form>
-                  </details>
-                )}
+                      </details>
+                    )}
 
-                <details className="disclosure text-sm">
-                  <summary className="text-foreground/70 font-medium">+ Nova aula</summary>
-                  <form
-                    action={createAula.bind(null, disciplina.id)}
-                    className="flex flex-col gap-2 mt-3"
-                  >
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input name="tema" placeholder="Tema da aula" required className="flex-1 field" />
-                      <input
-                        name="data"
-                        type="date"
-                        required
-                        defaultValue={new Date().toISOString().slice(0, 10)}
-                        className="field"
-                      />
-                    </div>
-                    <p className="text-xs text-foreground/50">
-                      As anotações são por login — depois de criar, abra a aula pra escrever as suas
-                      (e escolher se quer compartilhar com os colegas).
-                    </p>
-                    <button type="submit" className="self-start btn-primary">
-                      Salvar aula
-                    </button>
-                  </form>
-                </details>
-
-                <div className="flex flex-col gap-2">
-                  {disciplina.aulas.length === 0 && (
-                    <p className="text-xs text-foreground/50">Nenhuma aula registrada ainda.</p>
-                  )}
-                  {disciplina.aulas.map((aula) => (
-                    <Link
-                      key={aula.id}
-                      href={`/aulas/${aula.id}`}
-                      className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-sm hover:bg-black/[.03] dark:hover:bg-white/[.05]"
-                    >
-                      <span>{aula.tema}</span>
-                      <span className="text-xs text-foreground/50">{formatDate(aula.data)}</span>
-                    </Link>
-                  ))}
-                </div>
-
-                <details className="disclosure text-sm">
-                  <summary className="text-foreground/70 font-medium">
-                    📊 Frequência {disciplina.presencas.length > 0 ? `(${disciplina.presencas.length})` : ""}
-                  </summary>
-                  <div className="flex flex-col gap-3 mt-3">
-                    <form
-                      action={registrarPresenca.bind(null, disciplina.id)}
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <input
-                        name="data"
-                        type="date"
-                        required
-                        defaultValue={new Date().toISOString().slice(0, 10)}
-                        className="field !py-1.5 !text-xs"
-                      />
-                      <button
-                        type="submit"
-                        name="presente"
-                        value="true"
-                        className="text-xs rounded-full px-3 py-1 border border-green-600/40 text-green-700 dark:text-green-400"
-                      >
-                        ✅ Presente
-                      </button>
-                      <button
-                        type="submit"
-                        name="presente"
-                        value="false"
-                        className="text-xs rounded-full px-3 py-1 border border-red-600/40 text-red-600 dark:text-red-400"
-                      >
-                        ❌ Falta
-                      </button>
-                    </form>
-                    <p className="text-xs text-foreground/50">
-                      Registre ou corrija uma data (se já existir frequência naquele dia, isso substitui).
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {disciplina.presencas.length === 0 && (
-                        <p className="text-xs text-foreground/50">Nenhuma frequência registrada ainda.</p>
-                      )}
-                      {disciplina.presencas.map((presenca) => (
-                        <div
-                          key={presenca.id}
-                          className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-xs"
+                    <p className="section-title mt-3">Mais opções</p>
+                    <details className="disclosure rounded-lg bg-black/[.03] dark:bg-white/[.04]">
+                      <summary className="px-3 py-2 text-sm font-medium text-foreground/80">+ Nova aula</summary>
+                      <div className="px-3 pb-3 text-sm">
+                        <form
+                          action={createAula.bind(null, disciplina.id)}
+                          className="flex flex-col gap-2 mt-1"
                         >
-                          <span>{formatDate(presenca.data)}</span>
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={
-                                presenca.presente
-                                  ? "text-green-700 dark:text-green-400 font-medium"
-                                  : "text-red-600 dark:text-red-400 font-medium"
-                              }
-                            >
-                              {presenca.presente ? "Presente" : "Falta"}
-                            </span>
-                            <form action={removerPresenca.bind(null, presenca.id)}>
-                              <button type="submit" className="text-foreground/40 hover:text-red-600">
-                                Remover
-                              </button>
-                            </form>
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input name="tema" placeholder="Tema da aula" required className="flex-1 field" />
+                            <input
+                              name="data"
+                              type="date"
+                              required
+                              defaultValue={dateOnlyKey(hojeNoBrasil())}
+                              className="field"
+                            />
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-
-                <details className="disclosure text-sm">
-                  <summary className="text-foreground/70 font-medium">🧠 Quiz de revisão</summary>
-                  <div className="flex flex-col gap-3 mt-3">
-                    {!isIAConfigured() ? (
-                      <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
-                    ) : (
-                      <>
-                        {disciplina.aulas.some((a) => a.conteudoCompartilhado) && (
-                          <form action={gerarQuizDisciplina.bind(null, disciplina.id)}>
+                          <p className="text-xs text-foreground/50">
+                            As anotações são por login — depois de criar, abra a aula pra escrever as suas
+                            (e escolher se quer compartilhar com os colegas).
+                          </p>
+                          <button type="submit" className="self-start btn-primary">
+                            Salvar aula
+                          </button>
+                        </form>
+                      </div>
+                    </details>
+                    <details className="disclosure rounded-lg bg-black/[.03] dark:bg-white/[.04]">
+                      <summary className="px-3 py-2 text-sm font-medium text-foreground/80">📊 Frequência {disciplina.presencas.length > 0 ? `(${disciplina.presencas.length})` : ""}</summary>
+                      <div className="px-3 pb-3 text-sm">
+                        <div className="flex flex-col gap-3 mt-1">
+                          <form
+                            action={registrarPresenca.bind(null, disciplina.id)}
+                            className="flex flex-wrap items-center gap-2"
+                          >
+                            <input
+                              name="data"
+                              type="date"
+                              required
+                              defaultValue={dateOnlyKey(hojeNoBrasil())}
+                              className="field !py-1.5 !text-xs"
+                            />
                             <button
                               type="submit"
-                              className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+                              name="presente"
+                              value="true"
+                              className="text-xs rounded-full px-3 py-1 border border-green-600/40 text-green-700 dark:text-green-400"
                             >
-                              {disciplina.quizIA?.length ? "Gerar outro quiz" : "Gerar quiz de revisão"}
+                              ✅ Presente
+                            </button>
+                            <button
+                              type="submit"
+                              name="presente"
+                              value="false"
+                              className="text-xs rounded-full px-3 py-1 border border-red-600/40 text-red-600 dark:text-red-400"
+                            >
+                              ❌ Falta
                             </button>
                           </form>
-                        )}
-                        {disciplina.quizIA?.length ? (
-                          <QuizPlayer perguntas={disciplina.quizIA} />
-                        ) : (
                           <p className="text-xs text-foreground/50">
-                            Junta as anotações de todas as aulas com conteúdo dessa disciplina e gera
-                            perguntas de revisão para treinar antes da prova.
+                            Registre ou corrija uma data (se já existir frequência naquele dia, isso substitui).
                           </p>
-                        )}
-                      </>
+                          <div className="flex flex-col gap-2">
+                            {disciplina.presencas.length === 0 && (
+                              <p className="text-xs text-foreground/50">Nenhuma frequência registrada ainda.</p>
+                            )}
+                            {disciplina.presencas.map((presenca) => (
+                              <div
+                                key={presenca.id}
+                                className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2 text-xs"
+                              >
+                                <span>{formatDate(presenca.data)}</span>
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className={
+                                      presenca.presente
+                                        ? "text-green-700 dark:text-green-400 font-medium"
+                                        : "text-red-600 dark:text-red-400 font-medium"
+                                    }
+                                  >
+                                    {presenca.presente ? "Presente" : "Falta"}
+                                  </span>
+                                  <form action={removerPresenca.bind(null, presenca.id)}>
+                                    <button type="submit" className="text-foreground/40 hover:text-red-600">
+                                      Remover
+                                    </button>
+                                  </form>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                    <details className="disclosure rounded-lg bg-black/[.03] dark:bg-white/[.04]">
+                      <summary className="px-3 py-2 text-sm font-medium text-foreground/80">🧠 Quiz de revisão</summary>
+                      <div className="px-3 pb-3 text-sm">
+                        <div className="flex flex-col gap-3 mt-1">
+                          {!isIAConfigured() ? (
+                            <p className="text-xs text-foreground/50">Recurso de IA ainda não configurado neste app.</p>
+                          ) : (
+                            <>
+                              {disciplina.aulas.some((a) => a.conteudoCompartilhado) && (
+                                <form action={gerarQuizDisciplina.bind(null, disciplina.id)}>
+                                  <button
+                                    type="submit"
+                                    className="text-xs rounded-full border border-black/15 dark:border-white/15 px-3 py-1"
+                                  >
+                                    {disciplina.quizIA?.length ? "Gerar outro quiz" : "Gerar quiz de revisão"}
+                                  </button>
+                                </form>
+                              )}
+                              {disciplina.quizIA?.length ? (
+                                <QuizPlayer perguntas={disciplina.quizIA} />
+                              ) : (
+                                <p className="text-xs text-foreground/50">
+                                  Junta as anotações de todas as aulas com conteúdo dessa disciplina e gera
+                                  perguntas de revisão para treinar antes da prova.
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                    {isAdmin && (
+                      <details className="disclosure rounded-lg bg-black/[.03] dark:bg-white/[.04]">
+                        <summary className="px-3 py-2 text-sm font-medium text-foreground/80">⚙️ Editar disciplina</summary>
+                        <div className="px-3 pb-3 text-sm">
+                          <form
+                            action={updateDisciplina.bind(null, disciplina.id)}
+                            className="flex flex-col gap-2 mt-1"
+                          >
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input name="nome" defaultValue={disciplina.nome} required className="flex-1 field" />
+                              <input
+                                name="semestre"
+                                defaultValue={disciplina.semestre}
+                                required
+                                className="w-40 field"
+                              />
+                            </div>
+                            <select name="professorId" defaultValue={disciplina.professorId ?? ""} className="field">
+                              <option value="">Sem professor vinculado</option>
+                              {professores.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.nome}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex flex-col gap-1.5">
+                              <span className="text-xs font-medium text-foreground/60">
+                                Dias da semana com aula (calendário fixo do semestre)
+                              </span>
+                              <div className="flex flex-wrap gap-3">
+                                {DIAS_SEMANA_ABREV.map((label, i) => (
+                                  <label key={i} className="flex items-center gap-1.5 text-xs">
+                                    <input
+                                      type="checkbox"
+                                      name="diasSemana"
+                                      value={i}
+                                      defaultChecked={disciplina.diasSemana?.includes(i)}
+                                    />
+                                    {label}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <input
+                              name="horario"
+                              placeholder="Horário (opcional, ex: 19:10 às 22:00)"
+                              defaultValue={disciplina.horario ?? ""}
+                              className="field"
+                            />
+                            <button type="submit" className="self-start btn-primary">
+                              Salvar alterações
+                            </button>
+                          </form>
+                          <form
+                            action={arquivarDisciplina.bind(null, disciplina.id)}
+                            className="mt-4 pt-3 border-t border-black/10 dark:border-white/10"
+                          >
+                            <button type="submit" className="btn-danger-text">
+                              🗑️ Mandar pra lixeira
+                            </button>
+                          </form>
+                        </div>
+                      </details>
                     )}
                   </div>
                 </details>
-              </section>
-            ))}
+              );
+            })}
           </div>
         </div>
       </details>

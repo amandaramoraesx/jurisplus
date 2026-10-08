@@ -21,6 +21,7 @@ import { AnexoIcone, formatBytes } from "@/components/Anexo";
 import { ResumoCards } from "@/components/ResumoCards";
 import { ShareButton } from "@/components/ShareButton";
 import { MapaMental } from "@/components/MapaMental";
+import { EditorAnotacao } from "@/components/EditorAnotacao";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,8 @@ export default async function AulaDetailPage({
 
   const [disciplinaDoc, favoritosSnap, minhaAnotacao, notasCompartilhadas] = await Promise.all([
     db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
-    db.collection("vademecum_favoritos").where("aulaId", "==", id).get(),
+    // Favoritos do Vade Mecum são de cada um.
+    db.collection("vademecum_favoritos").where("aulaId", "==", id).where("uid", "==", user.uid).get(),
     buscarMinhaAnotacao(id, user.uid),
     buscarNotasCompartilhadas(id),
   ]);
@@ -55,15 +57,6 @@ export default async function AulaDetailPage({
   const temConteudoCompartilhado = temLegado || notasDosColegas.length > 0 || Boolean(aula.resumoIA);
   const textoParaCards = aula.resumoIA || textoCompartilhadoParaIA(aula, notasCompartilhadas);
 
-  const textoParaCompartilhar = [
-    `${aula.disciplina.nome} — ${aula.tema}`,
-    [aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n") || null,
-    minhaAnotacao ? [minhaAnotacao.resumo, minhaAnotacao.anotacoesLousa].filter(Boolean).join("\n") : null,
-    ...notasDosColegas.map((nota) => [nota.resumo, nota.anotacoesLousa].filter(Boolean).join("\n")),
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -74,17 +67,37 @@ export default async function AulaDetailPage({
           ← {aula.disciplina.nome}
         </Link>
         <h1 className="text-2xl font-bold mt-1">{aula.tema}</h1>
+        <p className="text-sm text-foreground/60 mt-0.5">
+          {aula.disciplina.nome} ·{" "}
+          {new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "UTC" }).format(aula.data)}
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary">
           🖨️ Ver / Salvar em PDF
         </Link>
-        <ShareButton title={aula.tema} text={textoParaCompartilhar} className="btn-primary" />
-        <a href="#minhas-anotacoes" className="btn-ghost">
-          ✏️ Editar minhas anotações
-        </a>
+        <ShareButton aulaId={aula.id} title={aula.tema} className="btn-primary" />
       </div>
+
+      <section id="minhas-anotacoes" className="card flex flex-col gap-3 scroll-mt-24">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
+            Minhas anotações
+          </h2>
+          <span className="text-xs text-foreground/50 text-right">
+            Só você vê, a não ser que ative &ldquo;compartilhar&rdquo;.
+          </span>
+        </div>
+        <EditorAnotacao
+          action={salvarAnotacaoPessoal.bind(null, aula.id)}
+          resumoInicial={minhaAnotacao?.resumo ?? ""}
+          lousaInicial={minhaAnotacao?.anotacoesLousa ?? ""}
+          compartilhadoInicial={minhaAnotacao?.compartilhado ?? false}
+          titulo={`${aula.disciplina.nome} — ${aula.tema}`}
+        />
+      </section>
 
       <section className="card">
         {!temConteudoCompartilhado ? (
@@ -95,7 +108,7 @@ export default async function AulaDetailPage({
         ) : (
           <details className="disclosure" open>
             <summary className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">👥 Anotações compartilhadas</h2>
+              <h2 className="font-semibold">👥 Anotações dos colegas</h2>
               <span className="btn-ghost shrink-0">Abrir</span>
             </summary>
             <div className="flex flex-col gap-4 mt-4">
@@ -133,60 +146,6 @@ export default async function AulaDetailPage({
           </details>
         )}
       </section>
-
-      <details id="minhas-anotacoes" className="disclosure card" open>
-        <summary className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-sm text-foreground/70">📝 Minhas anotações</h2>
-          <span
-            className={`text-[10px] rounded-full px-2 py-0.5 shrink-0 ${
-              minhaAnotacao?.compartilhado
-                ? "bg-blue-600/10 text-blue-700 dark:text-blue-400"
-                : "bg-black/5 dark:bg-white/10 text-foreground/50"
-            }`}
-          >
-            {minhaAnotacao?.compartilhado ? "🌐 compartilhada" : "🔒 só sua"}
-          </span>
-        </summary>
-        <form action={salvarAnotacaoPessoal.bind(null, aula.id)} className="flex flex-col gap-3 mt-3">
-          <p className="text-xs text-foreground/50">
-            Só você vê essas anotações, a não ser que marque a opção de compartilhar com os colegas.
-          </p>
-          <label className="text-xs font-medium text-foreground/60">
-            Anotações
-            <textarea
-              name="resumo"
-              defaultValue={minhaAnotacao?.resumo ?? ""}
-              rows={6}
-              placeholder="Escreva aqui suas anotações sobre a aula..."
-              className="mt-1 w-full field"
-            />
-          </label>
-          <label className="text-xs font-medium text-foreground/60">
-            Lousa
-            <textarea
-              name="anotacoesLousa"
-              defaultValue={minhaAnotacao?.anotacoesLousa ?? ""}
-              rows={6}
-              placeholder="Copie aqui o que o professor escreveu na lousa..."
-              className="mt-1 w-full field font-mono"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs text-foreground/70">
-            <input
-              type="checkbox"
-              name="compartilhado"
-              defaultChecked={minhaAnotacao?.compartilhado ?? false}
-              className="accent-[var(--accent)]"
-            />
-            🌐 Compartilhar essa anotação com os colegas (senão só você vê)
-          </label>
-          <div className="flex gap-3">
-            <SubmitButton savedLabel="✅ Anotação salva!" pendingLabel="Salvando...">
-              Salvar
-            </SubmitButton>
-          </div>
-        </form>
-      </details>
 
       <details className="disclosure card">
         <summary className="text-foreground/70 font-medium">✏️ Editar tema/data da aula</summary>
@@ -402,14 +361,16 @@ export default async function AulaDetailPage({
         </div>
       )}
 
-      <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
-        <button
-          type="submit"
-          className="btn-danger-text"
-        >
-          Remover esta aula
-        </button>
-      </form>
+      {user.role === "admin" && (
+        <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
+          <button
+            type="submit"
+            className="btn-danger-text"
+          >
+            Remover esta aula
+          </button>
+        </form>
+      )}
     </div>
   );
 }

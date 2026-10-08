@@ -2,8 +2,10 @@
 
 import { db } from "@/lib/firebase-admin";
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth";
 
 export async function createProva(formData: FormData) {
+  await requireUser();
   const disciplinaId = String(formData.get("disciplinaId") || "").trim();
   const dataStr = String(formData.get("data") || "");
   const conteudo = String(formData.get("conteudo") || "").trim();
@@ -22,6 +24,7 @@ export async function createProva(formData: FormData) {
 }
 
 export async function updateProva(id: string, formData: FormData) {
+  await requireUser();
   const disciplinaId = String(formData.get("disciplinaId") || "").trim();
   const dataStr = String(formData.get("data") || "");
   const conteudo = String(formData.get("conteudo") || "").trim();
@@ -42,6 +45,7 @@ export async function updateProva(id: string, formData: FormData) {
 }
 
 export async function deleteProva(id: string) {
+  await requireUser();
   await db.collection("provas").doc(id).delete();
   revalidatePath("/provas");
   revalidatePath("/aulas");

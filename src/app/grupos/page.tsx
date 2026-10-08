@@ -1,5 +1,6 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Disciplina, type Grupo } from "@/lib/firestore";
+import { requireUser } from "@/lib/auth";
 import {
   createGrupo,
   updateGrupo,
@@ -11,25 +12,28 @@ import {
 export const dynamic = "force-dynamic";
 
 function formatDate(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
 export default async function GruposPage() {
+  const user = await requireUser();
   const [gruposSnap, disciplinasSnap] = await Promise.all([
-    db.collection("grupos").orderBy("data", "desc").get(),
+    db.collection("grupos").where("uid", "==", user.uid).get(),
     db.collection("disciplinas").orderBy("nome", "asc").get(),
   ]);
 
   const disciplinas = disciplinasSnap.docs.map((doc) => fromDoc<Disciplina>(doc));
   const disciplinasPorId = new Map(disciplinas.map((d) => [d.id, d]));
 
-  const grupos = gruposSnap.docs.map((doc) => {
-    const grupo = fromDoc<Grupo>(doc);
-    return {
-      ...grupo,
-      disciplina: grupo.disciplinaId ? disciplinasPorId.get(grupo.disciplinaId) ?? null : null,
-    };
-  });
+  const grupos = gruposSnap.docs
+    .map((doc) => {
+      const grupo = fromDoc<Grupo>(doc);
+      return {
+        ...grupo,
+        disciplina: grupo.disciplinaId ? disciplinasPorId.get(grupo.disciplinaId) ?? null : null,
+      };
+    })
+    .sort((a, b) => b.data.getTime() - a.data.getTime());
 
   return (
     <div className="flex flex-col gap-6">
