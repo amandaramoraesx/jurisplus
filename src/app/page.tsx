@@ -324,7 +324,8 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {disciplinasSemCalendario.length > 0 && (
+      {/* Só admin consegue definir os dias da disciplina; pra aluno o aviso não ajuda. */}
+      {user.role === "admin" && disciplinasSemCalendario.length > 0 && (
         <p className="text-xs text-foreground/60 rounded-xl border border-dashed border-black/15 dark:border-white/15 px-4 py-3">
           🗓️ {disciplinasSemCalendario.map((d) => d.nome).join(", ")}{" "}
           {disciplinasSemCalendario.length === 1 ? "está" : "estão"} sem dia da semana definido e não
