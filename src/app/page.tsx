@@ -79,6 +79,80 @@ function AnotarDisciplina({
   );
 }
 
+function CheckinItem({
+  disciplina,
+  status,
+}: {
+  disciplina: DisciplinaComExtras;
+  status: boolean | undefined;
+}) {
+  const detalhe = [disciplina.professor?.nome, disciplina.horario].filter(Boolean).join(" · ");
+  const botoes = (
+    <div className="grid grid-cols-2 gap-2">
+      <form action={marcarPresenca.bind(null, disciplina.id, true)}>
+        <SubmitButton
+          pendingLabel="Salvando..."
+          savedLabel="Presente"
+          className="w-full rounded-lg py-2.5 text-sm font-semibold bg-green-600 text-white active:scale-[0.98] disabled:opacity-60"
+        >
+          ✅ Estou presente
+        </SubmitButton>
+      </form>
+      <form action={marcarPresenca.bind(null, disciplina.id, false)}>
+        <SubmitButton
+          pendingLabel="Salvando..."
+          savedLabel="Falta"
+          className="w-full rounded-lg py-2.5 text-sm font-semibold border border-black/15 dark:border-white/20 text-foreground/80 active:scale-[0.98] disabled:opacity-60"
+        >
+          Faltei
+        </SubmitButton>
+      </form>
+    </div>
+  );
+
+  // Pendente: cartão com os dois botões grandes.
+  if (status === undefined) {
+    return (
+      <div className="rounded-xl border border-black/10 dark:border-white/10 p-3 flex flex-col gap-3">
+        <div className="min-w-0">
+          <span className="font-semibold block truncate">{disciplina.nome}</span>
+          {detalhe && <span className="text-xs text-foreground/50 block truncate">{detalhe}</span>}
+        </div>
+        {botoes}
+      </div>
+    );
+  }
+
+  // Já registrado: linha compacta, com "Alterar" pra corrigir.
+  return (
+    <details
+      className={`disclosure rounded-xl border ${
+        status
+          ? "border-green-600/30 bg-green-600/[.06]"
+          : "border-red-600/30 bg-red-600/[.06]"
+      }`}
+    >
+      <summary className="px-3 py-2.5 gap-3">
+        <span className="text-lg shrink-0" aria-hidden>
+          {status ? "✅" : "❌"}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="font-semibold block truncate">{disciplina.nome}</span>
+          <span
+            className={`text-xs font-medium block ${
+              status ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            {status ? "Presença registrada" : "Falta registrada"}
+          </span>
+        </span>
+        <span className="text-xs text-foreground/50 shrink-0">Alterar</span>
+      </summary>
+      <div className="px-3 pb-3">{botoes}</div>
+    </details>
+  );
+}
+
 export default async function DashboardPage() {
   const user = await requireUser();
   const hoje = hojeNoBrasil();
@@ -156,7 +230,8 @@ export default async function DashboardPage() {
   const disciplinasHoje = disciplinas.filter((d) => d.diasSemana?.includes(hojeDiaSemana));
   const disciplinasSemCalendario = disciplinas.filter((d) => !d.diasSemana || d.diasSemana.length === 0);
 
-  const checkinsFeitos = disciplinasHoje.filter((d) => presencaHojeMap.has(d.id)).length;
+  const pendentesHoje = disciplinasHoje.filter((d) => !presencaHojeMap.has(d.id));
+  const checkinsFeitos = disciplinasHoje.length - pendentesHoje.length;
   const primeiroNome = (user.nome || user.email || "").split(" ")[0] || "";
   const tudoFeitoHoje = disciplinasHoje.length > 0 && checkinsFeitos === disciplinasHoje.length;
 
@@ -171,7 +246,9 @@ export default async function DashboardPage() {
         </p>
         {disciplinasHoje.length > 0 && (
           <p className="text-sm mt-2 font-medium">
-            {tudoFeitoHoje ? "🎉 Check-in do dia todo feito!" : "✅ Bora fazer o check-in de hoje?"}
+            {tudoFeitoHoje
+              ? "🎉 Check-in do dia feito!"
+              : `✅ Falta${pendentesHoje.length > 1 ? "m" : ""} ${pendentesHoje.length} check-in${pendentesHoje.length > 1 ? "s" : ""} hoje`}
           </p>
         )}
       </div>
@@ -199,77 +276,50 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between gap-3">
-              <div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <h2 className="font-semibold flex items-center gap-2">
                   <span className="icon-badge bg-green-600/10 text-green-700 dark:text-green-400">✅</span>
                   Check-in de hoje
                 </h2>
-                <p className="text-xs text-foreground/60 mt-0.5">
-                  Hoje é {DIAS_SEMANA[hojeDiaSemana]}, você tem aula de{" "}
-                  <strong className="font-semibold text-foreground/80">
-                    {disciplinasHoje.map((d) => d.nome).join(" e ")}
-                  </strong>
-                  . {checkinsFeitos} de {disciplinasHoje.length} já registrada(s).
+                <p className="text-xs text-foreground/60 mt-1">
+                  {tudoFeitoHoje
+                    ? "Tudo registrado por hoje. Errou? Toque em “Alterar”."
+                    : `${DIAS_SEMANA[hojeDiaSemana]}: marque sua presença em cada aula.`}
                 </p>
               </div>
-              <form action={marcarTodasPresentes.bind(null, disciplinasHoje.map((d) => d.id))}>
-                <SubmitButton savedLabel="✅ Check-in feito!" pendingLabel="Marcando...">
-                  🎯 Fazer check-in
-                </SubmitButton>
-              </form>
+              <span
+                className={`text-xs font-semibold rounded-full px-2.5 py-1 shrink-0 ${
+                  tudoFeitoHoje
+                    ? "bg-green-600/15 text-green-700 dark:text-green-400"
+                    : "bg-black/5 dark:bg-white/10 text-foreground/70"
+                }`}
+              >
+                {checkinsFeitos} de {disciplinasHoje.length} {tudoFeitoHoje ? "✓" : ""}
+              </span>
             </div>
 
             <div className="flex flex-col gap-2">
-              {disciplinasHoje.map((disciplina) => {
-                const status = presencaHojeMap.get(disciplina.id);
-                return (
-                  <div
-                    key={disciplina.id}
-                    className="flex items-center justify-between rounded-lg border border-black/10 dark:border-white/10 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium block truncate">{disciplina.nome}</span>
-                      {(disciplina.professor || disciplina.horario) && (
-                        <span className="text-xs text-foreground/50 block truncate">
-                          {disciplina.professor ? disciplina.professor.nome : null}
-                          {disciplina.professor && disciplina.horario ? " · " : null}
-                          {disciplina.horario ?? null}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <form action={marcarPresenca.bind(null, disciplina.id, true)}>
-                        <SubmitButton
-                          pendingLabel="..."
-                          savedLabel="Presente"
-                          className={`text-xs rounded-full px-3 py-1 border ${
-                            status === true
-                              ? "bg-green-600 text-white border-green-600"
-                              : "border-black/15 dark:border-white/20 text-foreground/70"
-                          }`}
-                        >
-                          Presente
-                        </SubmitButton>
-                      </form>
-                      <form action={marcarPresenca.bind(null, disciplina.id, false)}>
-                        <SubmitButton
-                          pendingLabel="..."
-                          savedLabel="Faltei"
-                          className={`text-xs rounded-full px-3 py-1 border ${
-                            status === false
-                              ? "bg-red-600 text-white border-red-600"
-                              : "border-black/15 dark:border-white/20 text-foreground/70"
-                          }`}
-                        >
-                          Faltei
-                        </SubmitButton>
-                      </form>
-                    </div>
-                  </div>
-                );
-              })}
+              {disciplinasHoje.map((disciplina) => (
+                <CheckinItem
+                  key={disciplina.id}
+                  disciplina={disciplina}
+                  status={presencaHojeMap.get(disciplina.id)}
+                />
+              ))}
             </div>
+
+            {pendentesHoje.length > 1 && (
+              <form action={marcarTodasPresentes.bind(null, pendentesHoje.map((d) => d.id))}>
+                <SubmitButton
+                  savedLabel="Check-in feito!"
+                  pendingLabel="Marcando..."
+                  className="btn-primary w-full"
+                >
+                  ✅ Estou presente em todas ({pendentesHoje.length})
+                </SubmitButton>
+              </form>
+            )}
           </>
         )}
       </section>
@@ -318,7 +368,6 @@ export default async function DashboardPage() {
                 <span className="icon-badge bg-purple-600/10 text-purple-700 dark:text-purple-400">📊</span>
                 Frequência por disciplina
               </h2>
-              <span className="btn-ghost shrink-0">Ver</span>
             </summary>
             <div className="overflow-x-auto mt-4">
               <table className="w-full text-sm">
