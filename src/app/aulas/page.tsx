@@ -29,6 +29,7 @@ import {
 import { createProfessor, updateProfessor, deleteProfessor } from "@/app/professores/actions";
 import { createProva, updateProva, deleteProva } from "@/app/provas/actions";
 import { addNota, updateNota, deleteNota } from "@/app/notas/actions";
+import { SubmitButton } from "@/components/SubmitButton";
 import { requireUser } from "@/lib/auth";
 import {
   buscarAulasDoUsuario,
@@ -805,7 +806,17 @@ export default async function AcademicoPage({
 
           {disciplinasComNotas.map((d) => (
             <div key={d.id} className="card flex flex-col gap-3">
-              <p className="font-semibold">{d.nome}</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold">{d.nome}</p>
+                {d.notas.length > 0 && (
+                  <span className="chip shrink-0">
+                    Média{" "}
+                    {(d.notas.reduce((soma, n) => soma + n.valor, 0) / d.notas.length).toLocaleString("pt-BR", {
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                )}
+              </div>
               <div className="flex flex-col gap-2">
                 {d.notas.length === 0 && <p className="text-xs text-foreground/50">Nenhuma nota lançada.</p>}
                 {d.notas.map((nota) => (
@@ -813,7 +824,7 @@ export default async function AcademicoPage({
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm">{nota.descricao}</span>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="font-semibold text-sm">{nota.valor}</span>
+                        <span className="font-semibold text-sm">{nota.valor.toLocaleString("pt-BR")}</span>
                         <form action={deleteNota.bind(null, nota.id)}>
                           <button type="submit" className="btn-danger-text">
                             remover
@@ -832,25 +843,41 @@ export default async function AcademicoPage({
                         />
                         <input
                           name="valor"
-                          defaultValue={nota.valor}
+                          defaultValue={nota.valor.toLocaleString("pt-BR")}
                           required
                           inputMode="decimal"
                           className="w-20 field !text-xs !py-1.5"
                         />
-                        <button type="submit" className="btn-primary !text-xs !py-1.5 !px-3">
+                        <SubmitButton
+                          savedLabel="Salvo!"
+                          pendingLabel="Salvando..."
+                          className="btn-primary !text-xs !py-1.5 !px-3"
+                        >
                           Salvar
-                        </button>
+                        </SubmitButton>
                       </form>
                     </details>
                   </div>
                 ))}
               </div>
-              <form action={addNota.bind(null, d.id)} className="flex gap-2">
-                <input name="descricao" placeholder="Ex: Prova 1" required className="flex-1 field" />
-                <input name="valor" placeholder="Nota" required inputMode="decimal" className="w-24 field" />
-                <button type="submit" className="btn-primary">
-                  +
-                </button>
+              <form
+                action={addNota.bind(null, d.id)}
+                className="flex flex-col gap-2 rounded-xl border border-dashed border-black/15 dark:border-white/15 p-3"
+              >
+                <p className="text-xs font-semibold text-foreground/70">Lançar nova nota</p>
+                <div className="flex gap-2">
+                  <label className="flex-1 min-w-0 text-xs font-medium text-foreground/60 flex flex-col gap-1">
+                    Avaliação
+                    <input name="descricao" placeholder="Ex: Prova 1" required className="field" />
+                  </label>
+                  <label className="w-24 text-xs font-medium text-foreground/60 flex flex-col gap-1">
+                    Nota
+                    <input name="valor" placeholder="Ex: 8,5" required inputMode="decimal" className="field" />
+                  </label>
+                </div>
+                <SubmitButton savedLabel="Nota lançada!" pendingLabel="Lançando..." className="btn-primary w-full">
+                  ✅ Inserir nota
+                </SubmitButton>
               </form>
             </div>
           ))}
