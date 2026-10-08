@@ -81,8 +81,9 @@ export default async function AcademicoPage({
     db.collection("professores").orderBy("nome", "asc").get(),
     db.collection("aulas").orderBy("data", "desc").get(),
     db.collection("provas").orderBy("data", "asc").get(),
-    db.collection("notas").get(),
-    db.collection("presencas").orderBy("data", "desc").get(),
+    // Frequência e notas são de cada um; disciplinas, aulas e provas são da turma.
+    db.collection("notas").where("uid", "==", user.uid).get(),
+    db.collection("presencas").where("uid", "==", user.uid).get(),
   ]);
 
   const presencasPorDisciplina = new Map<string, Presenca[]>();
@@ -91,6 +92,9 @@ export default async function AcademicoPage({
     const lista = presencasPorDisciplina.get(presenca.disciplinaId) || [];
     lista.push(presenca);
     presencasPorDisciplina.set(presenca.disciplinaId, lista);
+  }
+  for (const lista of presencasPorDisciplina.values()) {
+    lista.sort((a, b) => b.data.getTime() - a.data.getTime());
   }
 
   const professores = professoresSnap.docs.map((doc) => fromDoc<Professor>(doc));

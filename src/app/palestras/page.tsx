@@ -1,16 +1,21 @@
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Palestra } from "@/lib/firestore";
+import { requireUser } from "@/lib/auth";
 import { createPalestra, updatePalestra, deletePalestra } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 function formatDate(d: Date) {
-  return new Intl.DateTimeFormat("pt-BR").format(d);
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
 }
 
 export default async function PalestrasPage() {
-  const palestrasSnap = await db.collection("palestras").orderBy("data", "desc").get();
-  const palestras = palestrasSnap.docs.map((doc) => fromDoc<Palestra>(doc));
+  const user = await requireUser();
+  // Horas complementares são de cada um.
+  const palestrasSnap = await db.collection("palestras").where("uid", "==", user.uid).get();
+  const palestras = palestrasSnap.docs
+    .map((doc) => fromDoc<Palestra>(doc))
+    .sort((a, b) => b.data.getTime() - a.data.getTime());
   const totalHoras = palestras.reduce((acc, p) => acc + p.horas, 0);
 
   return (

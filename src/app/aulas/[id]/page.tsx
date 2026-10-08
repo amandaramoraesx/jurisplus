@@ -38,7 +38,8 @@ export default async function AulaDetailPage({
 
   const [disciplinaDoc, favoritosSnap, minhaAnotacao, notasCompartilhadas] = await Promise.all([
     db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
-    db.collection("vademecum_favoritos").where("aulaId", "==", id).get(),
+    // Favoritos do Vade Mecum são de cada um.
+    db.collection("vademecum_favoritos").where("aulaId", "==", id).where("uid", "==", user.uid).get(),
     buscarMinhaAnotacao(id, user.uid),
     buscarNotasCompartilhadas(id),
   ]);
@@ -360,14 +361,16 @@ export default async function AulaDetailPage({
         </div>
       )}
 
-      <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
-        <button
-          type="submit"
-          className="btn-danger-text"
-        >
-          Remover esta aula
-        </button>
-      </form>
+      {user.role === "admin" && (
+        <form action={deleteAula.bind(null, aula.id, aula.disciplinaId)}>
+          <button
+            type="submit"
+            className="btn-danger-text"
+          >
+            Remover esta aula
+          </button>
+        </form>
+      )}
     </div>
   );
 }

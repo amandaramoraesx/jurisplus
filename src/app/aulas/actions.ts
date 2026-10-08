@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getAnthropicClient, gerarQuizComIA, gerarMapaMentalComIA } from "@/lib/anthropic";
 import { requireAdmin, requireUser } from "@/lib/auth";
-import { dateOnlyKey, type Anexo } from "@/lib/firestore";
+import { garantirDono, idPresenca } from "@/lib/dono";
+import { type Anexo } from "@/lib/firestore";
 import {
   buscarNotasCompartilhadas,
   buscarNotasCompartilhadasEmLote,
@@ -84,28 +85,28 @@ export async function updateDisciplina(id: string, formData: FormData) {
 
 /** Registra (ou corrige, se já existir nesse dia) a frequência de uma disciplina numa data qualquer. */
 export async function registrarPresenca(disciplinaId: string, formData: FormData) {
-  await requireUser();
+  const user = await requireUser();
 
   const dataStr = String(formData.get("data") || "");
   if (!dataStr) return;
   const presente = formData.get("presente") === "true";
 
   const data = new Date(dataStr);
-  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
 
   await db
     .collection("presencas")
-    .doc(id)
-    .set({ disciplinaId, data, presente, createdAt: new Date() }, { merge: true });
+    .doc(idPresenca(user.uid, disciplinaId, data))
+    .set({ uid: user.uid, disciplinaId, data, presente, createdAt: new Date() }, { merge: true });
 
   revalidatePath("/aulas");
   revalidatePath("/");
 }
 
 export async function removerPresenca(presencaId: string) {
-  await requireUser();
+  const user = await requireUser();
 
-  await db.collection("presencas").doc(presencaId).delete();
+  const doc = await garantirDono("presencas", presencaId, user.uid);
+  await doc.ref.delete();
 
   revalidatePath("/aulas");
   revalidatePath("/");
@@ -188,6 +189,7 @@ export async function excluirDisciplinaPermanentemente(id: string) {
 }
 
 export async function createAula(disciplinaId: string, formData: FormData) {
+  await requireUser();
   const tema = String(formData.get("tema") || "").trim();
   const dataStr = String(formData.get("data") || "");
 
@@ -208,6 +210,7 @@ export async function createAula(disciplinaId: string, formData: FormData) {
 }
 
 export async function updateAula(aulaId: string, formData: FormData) {
+  await requireUser();
   const tema = String(formData.get("tema") || "").trim();
   const dataStr = String(formData.get("data") || "");
 
@@ -256,6 +259,8 @@ export async function salvarAnotacaoPessoal(aulaId: string, formData: FormData) 
 }
 
 export async function deleteAula(aulaId: string, disciplinaId: string) {
+  // Apagar a aula apaga as anotações de todo mundo nela — só admin.
+  await requireAdmin();
   const [favoritosSnap, anotacoesSnap] = await Promise.all([
     db.collection("vademecum_favoritos").where("aulaId", "==", aulaId).get(),
     db.collection("aulas").doc(aulaId).collection("anotacoes").get(),
@@ -331,6 +336,7 @@ export async function removerAnexoAula(aulaId: string, anexoId: string, storageP
 }
 
 export async function gerarResumoIA(aulaId: string) {
+  await requireUser();
   const aulaDoc = await db.collection("aulas").doc(aulaId).get();
   const aula = aulaDoc.data();
   if (!aula) throw new Error("Aula não encontrada");
@@ -372,6 +378,7 @@ export async function gerarResumoIA(aulaId: string) {
 }
 
 export async function gerarQuizAula(aulaId: string) {
+  await requireUser();
   const aulaDoc = await db.collection("aulas").doc(aulaId).get();
   const aula = aulaDoc.data();
   if (!aula) throw new Error("Aula não encontrada");
@@ -388,6 +395,7 @@ export async function gerarQuizAula(aulaId: string) {
 }
 
 export async function gerarMapaMentalAula(aulaId: string) {
+  await requireUser();
   const aulaDoc = await db.collection("aulas").doc(aulaId).get();
   const aula = aulaDoc.data();
   if (!aula) throw new Error("Aula não encontrada");
@@ -404,6 +412,7 @@ export async function gerarMapaMentalAula(aulaId: string) {
 }
 
 export async function gerarQuizDisciplina(disciplinaId: string) {
+  await requireUser();
   const [disciplinaDoc, aulasSnap] = await Promise.all([
     db.collection("disciplinas").doc(disciplinaId).get(),
     db.collection("aulas").where("disciplinaId", "==", disciplinaId).get(),

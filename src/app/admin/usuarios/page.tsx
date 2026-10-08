@@ -1,6 +1,7 @@
 import { auth } from "@/lib/firebase-admin";
 import { requireAdminPage } from "@/lib/auth";
-import { criarUsuario, removerUsuario } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
+import { criarUsuario, removerUsuario, renomearUsuario } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export default async function UsuariosPage() {
     .map((u) => ({
       uid: u.uid,
       nome: u.displayName || "(sem nome)",
+      semNome: !u.displayName,
       email: u.email || "",
       role: (u.customClaims?.role as string) === "admin" ? "admin" : "aluno",
     }))
@@ -22,8 +24,10 @@ export default async function UsuariosPage() {
       <div>
         <h1 className="text-2xl font-bold">Usuários</h1>
         <p className="text-sm text-foreground/60 mt-1">
-          Crie logins pra colegas usarem o Juris+. Só quem é admin cadastra ou edita professores e
-          disciplinas — o resto do app fica liberado pra todo mundo.
+          Crie logins pra colegas usarem o Juris+. Disciplinas, professores, aulas e provas são da
+          turma (só admin cadastra disciplinas e professores). Frequência, notas, palestras, grupos,
+          favoritos e anotações são de cada login — ninguém vê os do outro, a não ser anotações
+          marcadas como &ldquo;compartilhar&rdquo;.
         </p>
       </div>
 
@@ -50,25 +54,42 @@ export default async function UsuariosPage() {
 
       <div className="flex flex-col gap-2">
         {usuarios.map((u) => (
-          <div key={u.uid} className="card flex items-center justify-between gap-3">
-            <div>
-              <p className="font-medium">
-                {u.nome}
-                {u.uid === admin.uid && (
-                  <span className="text-xs text-foreground/50 font-normal"> (você)</span>
-                )}
-              </p>
-              <p className="text-xs text-foreground/60">
-                {u.email} · {u.role === "admin" ? "Admin" : "Aluno"}
-              </p>
+          <div key={u.uid} className="card flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium truncate">
+                  {u.nome}
+                  {u.uid === admin.uid && (
+                    <span className="text-xs text-foreground/50 font-normal"> (você)</span>
+                  )}
+                </p>
+                <p className="text-xs text-foreground/60 truncate">
+                  {u.email} · {u.role === "admin" ? "Admin" : "Aluno"}
+                </p>
+              </div>
+              {u.uid !== admin.uid && (
+                <form action={removerUsuario.bind(null, u.uid)}>
+                  <button type="submit" className="btn-danger-text shrink-0">
+                    Remover acesso
+                  </button>
+                </form>
+              )}
             </div>
-            {u.uid !== admin.uid && (
-              <form action={removerUsuario.bind(null, u.uid)}>
-                <button type="submit" className="btn-danger-text shrink-0">
-                  Remover acesso
-                </button>
+            <details className="disclosure text-sm">
+              <summary className="text-xs font-medium text-foreground/60">✏️ Trocar nome</summary>
+              <form action={renomearUsuario.bind(null, u.uid)} className="flex gap-2 mt-2">
+                <input
+                  name="nome"
+                  defaultValue={u.semNome ? "" : u.nome}
+                  placeholder="Nome que aparece no app"
+                  required
+                  className="field flex-1 min-w-0"
+                />
+                <SubmitButton savedLabel="Salvo!" className="btn-primary shrink-0">
+                  Salvar
+                </SubmitButton>
               </form>
-            )}
+            </details>
           </div>
         ))}
       </div>

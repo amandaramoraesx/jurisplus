@@ -88,7 +88,7 @@ export default async function DashboardPage() {
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").get(),
     db.collection("aulas").get(),
-    db.collection("presencas").get(),
+    db.collection("presencas").where("uid", "==", user.uid).get(),
   ]);
 
   const professoresPorId = new Map(

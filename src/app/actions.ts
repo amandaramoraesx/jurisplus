@@ -3,6 +3,7 @@
 import { db } from "@/lib/firebase-admin";
 import { dateOnlyKey, hojeNoBrasil } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
+import { idPresenca } from "@/lib/dono";
 import { revalidatePath } from "next/cache";
 
 /** Garante que exista a aula "de hoje" da disciplina, pra check-in já vincular com a aula do dia. */
@@ -24,14 +25,14 @@ async function garantirAulaDoDia(disciplinaId: string, data: Date) {
 }
 
 export async function marcarPresenca(disciplinaId: string, presente: boolean) {
+  const user = await requireUser();
   const data = hojeNoBrasil();
-  const id = `${disciplinaId}_${dateOnlyKey(data)}`;
 
   await Promise.all([
     db
       .collection("presencas")
-      .doc(id)
-      .set({ disciplinaId, data, presente, createdAt: new Date() }, { merge: true }),
+      .doc(idPresenca(user.uid, disciplinaId, data))
+      .set({ uid: user.uid, disciplinaId, data, presente, createdAt: new Date() }, { merge: true }),
     garantirAulaDoDia(disciplinaId, data),
   ]);
 
@@ -41,14 +42,14 @@ export async function marcarPresenca(disciplinaId: string, presente: boolean) {
 }
 
 export async function marcarTodasPresentes(disciplinaIds: string[]) {
+  const user = await requireUser();
   const data = hojeNoBrasil();
 
   const batch = db.batch();
   for (const disciplinaId of disciplinaIds) {
-    const id = `${disciplinaId}_${dateOnlyKey(data)}`;
     batch.set(
-      db.collection("presencas").doc(id),
-      { disciplinaId, data, presente: true, createdAt: new Date() },
+      db.collection("presencas").doc(idPresenca(user.uid, disciplinaId, data)),
+      { uid: user.uid, disciplinaId, data, presente: true, createdAt: new Date() },
       { merge: true }
     );
   }
