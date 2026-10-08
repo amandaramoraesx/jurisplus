@@ -11,6 +11,7 @@ import {
 } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
 import { buscarMinhaAnotacao } from "@/lib/anotacoes";
+import { listarColegas, type Colega } from "@/lib/colegas";
 import { marcarPresenca, marcarTodasPresentes, anotarRapido } from "./actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { EditorAnotacao } from "@/components/EditorAnotacao";
@@ -21,19 +22,21 @@ type DisciplinaComExtras = Disciplina & {
   professor: Professor | null;
   totalAulas: number;
   presencas: Presenca[];
-  minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string };
+  minhaAnotacaoHoje: { resumo: string; anotacoesLousa: string; compartilhadoCom: string[] };
 };
 
 function AnotarDisciplina({
   disciplina,
   hojeKey,
   abrirPorPadrao,
+  colegas,
 }: {
   disciplina: DisciplinaComExtras;
   hojeKey: string;
   abrirPorPadrao?: boolean;
+  colegas: Colega[];
 }) {
-  const { resumo, anotacoesLousa } = disciplina.minhaAnotacaoHoje;
+  const { resumo, anotacoesLousa, compartilhadoCom } = disciplina.minhaAnotacaoHoje;
   const temAnotacao = Boolean(resumo || anotacoesLousa);
 
   return (
@@ -49,7 +52,7 @@ function AnotarDisciplina({
         </span>
         {temAnotacao && (
           <span className="text-[10px] rounded-full px-2 py-0.5 shrink-0 ml-auto bg-green-600/10 text-green-700 dark:text-green-400">
-            🔒 salva
+            {compartilhadoCom.length ? "👥 compartilhada" : "🔒 salva"}
           </span>
         )}
       </summary>
@@ -59,6 +62,8 @@ function AnotarDisciplina({
           resumoInicial={resumo}
           lousaInicial={anotacoesLousa}
           titulo={disciplina.nome}
+          colegas={colegas}
+          compartilhadoComInicial={compartilhadoCom}
           rodapeExtra={
             temAnotacao ? (
               <Link href={`/aulas/${disciplina.id}_${hojeKey}`} className="text-xs text-foreground/60 hover:underline">
@@ -151,12 +156,13 @@ export default async function DashboardPage() {
   const hoje = hojeNoBrasil();
   const hojeKey = dateOnlyKey(hoje);
 
-  const [disciplinasSnap, professoresSnap, aulasSnap, presencasSnap] = await Promise.all([
+  const [disciplinasSnap, professoresSnap, aulasSnap, presencasSnap, colegas] = await Promise.all([
     db.collection("disciplinas").orderBy("nome", "asc").get(),
     db.collection("professores").get(),
     // Só as aulas de que esse login participa.
     db.collection("aulas").where("participantes", "array-contains", user.uid).get(),
     db.collection("presencas").where("uid", "==", user.uid).get(),
+    listarColegas(user.uid),
   ]);
 
   const professoresPorId = new Map(
@@ -185,6 +191,7 @@ export default async function DashboardPage() {
       {
         resumo: minhasAnotacoesHoje[i]?.resumo || "",
         anotacoesLousa: minhasAnotacoesHoje[i]?.anotacoesLousa || "",
+        compartilhadoCom: minhasAnotacoesHoje[i]?.compartilhadoCom ?? [],
       },
     ])
   );
@@ -209,6 +216,7 @@ export default async function DashboardPage() {
       minhaAnotacaoHoje: anotacaoHojePorDisciplina.get(disciplina.id) || {
         resumo: "",
         anotacoesLousa: "",
+        compartilhadoCom: [],
       },
     }));
 
@@ -347,6 +355,7 @@ export default async function DashboardPage() {
                 disciplina={disciplina}
                 hojeKey={hojeKey}
                 abrirPorPadrao={disciplinasHoje.length === 1}
+                colegas={colegas}
               />
             ))}
           </div>

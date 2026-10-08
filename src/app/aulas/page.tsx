@@ -30,7 +30,12 @@ import { createProfessor, updateProfessor, deleteProfessor } from "@/app/profess
 import { createProva, updateProva, deleteProva } from "@/app/provas/actions";
 import { addNota, updateNota, deleteNota } from "@/app/notas/actions";
 import { requireUser } from "@/lib/auth";
-import { buscarAulasDoUsuario, buscarMinhasAnotacoesEmLote, textoDaAnotacao } from "@/lib/anotacoes";
+import {
+  buscarAulasDoUsuario,
+  buscarCompartilhadasComigoEmLote,
+  buscarMinhasAnotacoesEmLote,
+  textoDaAnotacao,
+} from "@/lib/anotacoes";
 import { isIAConfigured } from "@/lib/anthropic";
 import { NotificacoesButton } from "@/components/NotificacoesButton";
 import { QuizPlayer } from "@/components/QuizPlayer";
@@ -43,7 +48,7 @@ function formatDate(d: Date) {
 
 const AULAS_VISIVEIS = 5;
 
-function AulaLinha({ aula }: { aula: Aula & { meuConteudo: string } }) {
+function AulaLinha({ aula }: { aula: Aula & { meuConteudo: string; recebidaDe: string[] } }) {
   return (
     <Link
       href={`/aulas/${aula.id}`}
@@ -53,9 +58,14 @@ function AulaLinha({ aula }: { aula: Aula & { meuConteudo: string } }) {
       <span className="min-w-0 flex-1">
         <span className="text-sm font-medium block truncate">{aula.tema}</span>
         {aula.meuConteudo ? (
-          <span className="text-[11px] text-green-700 dark:text-green-400">📝 com anotação</span>
-        ) : (
-          <span className="text-[11px] text-foreground/45">sem anotação</span>
+          <span className="text-[11px] text-green-700 dark:text-green-400 block">📝 com anotação</span>
+        ) : aula.recebidaDe.length === 0 ? (
+          <span className="text-[11px] text-foreground/45 block">sem anotação</span>
+        ) : null}
+        {aula.recebidaDe.length > 0 && (
+          <span className="text-[11px] text-purple-700 dark:text-purple-400 block truncate">
+            📥 compartilhada por {aula.recebidaDe.join(", ")}
+          </span>
         )}
       </span>
       <span aria-hidden className="text-foreground/40">›</span>
@@ -104,13 +114,21 @@ export default async function AcademicoPage({
 
   // Conteúdo de cada aula = só as anotações do próprio login. É a mesma fonte do quiz por IA,
   // então "tem conteúdo pra estudar" e "dá pra gerar quiz" batem.
-  const meusCadernos = await buscarMinhasAnotacoesEmLote(aulasRaw.map((a) => a.id), user.uid);
+  const [meusCadernos, recebidasPorAula] = await Promise.all([
+    buscarMinhasAnotacoesEmLote(aulasRaw.map((a) => a.id), user.uid),
+    // Só olha as aulas em que alguém compartilhou com esse login.
+    buscarCompartilhadasComigoEmLote(
+      aulasRaw.filter((a) => a.leitores?.includes(user.uid)).map((a) => a.id),
+      user.uid
+    ),
+  ]);
 
-  const aulasPorDisciplina = new Map<string, (Aula & { meuConteudo: string })[]>();
+  const aulasPorDisciplina = new Map<string, (Aula & { meuConteudo: string; recebidaDe: string[] })[]>();
   for (const aula of aulasRaw) {
     const meuConteudo = textoDaAnotacao(meusCadernos.get(aula.id));
+    const recebidaDe = (recebidasPorAula.get(aula.id) ?? []).map((n) => n.nome.split(" ")[0]);
     const lista = aulasPorDisciplina.get(aula.disciplinaId) || [];
-    lista.push({ ...aula, meuConteudo });
+    lista.push({ ...aula, meuConteudo, recebidaDe });
     aulasPorDisciplina.set(aula.disciplinaId, lista);
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { SubmitButton } from "@/components/SubmitButton";
+import type { Colega } from "@/lib/colegas";
 
 type Aba = "anotacoes" | "lousa";
 
@@ -21,12 +22,17 @@ export function EditorAnotacao({
   lousaInicial,
   titulo,
   rodapeExtra,
+  colegas = [],
+  compartilhadoComInicial = [],
 }: {
   action: (formData: FormData) => void | Promise<void>;
   resumoInicial: string;
   lousaInicial: string;
   titulo?: string;
   rodapeExtra?: React.ReactNode;
+  /** Logins com quem dá pra compartilhar (só anotação e lousa, só leitura). */
+  colegas?: Colega[];
+  compartilhadoComInicial?: string[];
 }) {
   const [aba, setAba] = useState<Aba>("anotacoes");
   // Controlados de propósito: o React reseta forms não controlados depois da action.
@@ -34,6 +40,13 @@ export function EditorAnotacao({
   const [lousa, setLousa] = useState(lousaInicial);
   const [telaCheia, setTelaCheia] = useState(false);
   const [letraGrande, setLetraGrande] = useState(false);
+  const [compartilhadoCom, setCompartilhadoCom] = useState<string[]>(compartilhadoComInicial);
+  const [escolhendo, setEscolhendo] = useState(false);
+  const nomesCompartilhados = colegas.filter((c) => compartilhadoCom.includes(c.uid)).map((c) => c.nome.split(" ")[0]);
+
+  function alternarColega(uid: string) {
+    setCompartilhadoCom((atual) => (atual.includes(uid) ? atual.filter((u) => u !== uid) : [...atual, uid]));
+  }
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -138,8 +151,56 @@ export function EditorAnotacao({
         />
       </div>
 
+      {/* Sempre no form (mesmo com a lista fechada) pra salvar a escolha junto com o texto. */}
+      {compartilhadoCom.map((uid) => (
+        <input key={uid} type="hidden" name="compartilhadoCom" value={uid} />
+      ))}
+
+      {escolhendo && (
+        <div className="rounded-xl border border-black/10 dark:border-white/10 p-3 flex flex-col gap-2">
+          <p className="text-xs font-semibold text-foreground/70">
+            Com quem compartilhar? Eles só leem sua anotação e lousa desta aula.
+          </p>
+          {colegas.length === 0 ? (
+            <p className="text-xs text-foreground/50">Ainda não tem outros logins no Juris+.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {colegas.map((colega) => {
+                const marcado = compartilhadoCom.includes(colega.uid);
+                return (
+                  <button
+                    key={colega.uid}
+                    type="button"
+                    aria-pressed={marcado}
+                    onClick={() => alternarColega(colega.uid)}
+                    className={`text-xs rounded-full px-3 py-1.5 border transition-colors ${
+                      marcado
+                        ? "bg-[var(--accent)] text-[var(--accent-foreground)] border-[var(--accent)]"
+                        : "border-black/15 dark:border-white/20 text-foreground/75"
+                    }`}
+                  >
+                    {marcado ? "✓ " : ""}
+                    {colega.nome}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p className="text-[11px] text-foreground/45">Toque em Salvar pra confirmar.</p>
+        </div>
+      )}
+
       <div className="editor-rodape">
-        <span className="text-xs text-foreground/60">🔒 Só você vê</span>
+        <button
+          type="button"
+          onClick={() => setEscolhendo((v) => !v)}
+          aria-expanded={escolhendo}
+          className="editor-tool !px-2 text-left"
+        >
+          {nomesCompartilhados.length > 0
+            ? `👥 Compartilhada com ${nomesCompartilhados.join(", ")}`
+            : "🔒 Só você vê · 👥 Compartilhar"}
+        </button>
         <span className="text-[11px] text-foreground/45 hidden sm:inline">
           {contarPalavras(textoAtual)} palavras · Ctrl+S salva
         </span>

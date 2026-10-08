@@ -32,19 +32,48 @@ export function textoDaAnotacao(nota: Pick<AnotacaoPessoal, "resumo" | "anotacoe
 }
 
 /**
- * Aulas que aparecem pra esse login: só as que ele participa (fez check-in, anotou ou criou).
- * Ordena em memória (array-contains + orderBy exigiria índice composto).
+ * Aulas que aparecem pra esse login: as que ele participa (fez check-in, anotou ou criou) e as
+ * que algum colega compartilhou com ele. Ordena em memória (array-contains + orderBy exigiria
+ * índice composto).
  */
 export async function buscarAulasDoUsuario(uid: string, disciplinaId?: string): Promise<Aula[]> {
-  const snap = await db.collection("aulas").where("participantes", "array-contains", uid).get();
-  return snap.docs
-    .map((doc) => fromDoc<Aula>(doc))
+  const [minhas, compartilhadas] = await Promise.all([
+    db.collection("aulas").where("participantes", "array-contains", uid).get(),
+    db.collection("aulas").where("leitores", "array-contains", uid).get(),
+  ]);
+  const porId = new Map<string, Aula>();
+  for (const doc of [...minhas.docs, ...compartilhadas.docs]) porId.set(doc.id, fromDoc<Aula>(doc));
+  return [...porId.values()]
     .filter((aula) => !disciplinaId || aula.disciplinaId === disciplinaId)
     .sort((a, b) => b.data.getTime() - a.data.getTime());
 }
 
 export function participaDaAula(aula: Pick<Aula, "participantes">, uid: string) {
   return Boolean(aula.participantes?.includes(uid));
+}
+
+/** Pode abrir a aula: participa dela ou um colega compartilhou a anotação com ele. */
+export function podeVerAula(aula: Pick<Aula, "participantes" | "leitores">, uid: string) {
+  return participaDaAula(aula, uid) || Boolean(aula.leitores?.includes(uid));
+}
+
+/** Anotações de colegas que compartilharam esta aula comigo (só anotação e lousa). */
+export async function buscarCompartilhadasComigo(aulaId: string, uid: string): Promise<AnotacaoPessoal[]> {
+  const snap = await refAnotacoes(aulaId).where("compartilhadoCom", "array-contains", uid).get();
+  return snap.docs.map((doc) => fromDoc<AnotacaoPessoal>(doc)).filter((nota) => nota.uid !== uid);
+}
+
+export async function buscarCompartilhadasComigoEmLote(aulaIds: string[], uid: string) {
+  const listas = await Promise.all(aulaIds.map((id) => buscarCompartilhadasComigo(id, uid)));
+  return new Map(aulaIds.map((id, i) => [id, listas[i]]));
+}
+
+/** Recalcula `leitores` da aula (união do `compartilhadoCom` de todos os cadernos). */
+export async function atualizarLeitores(aulaId: string) {
+  const snap = await refAnotacoes(aulaId).get();
+  const leitores = new Set<string>();
+  for (const doc of snap.docs) for (const uid of (doc.data().compartilhadoCom as string[] | undefined) ?? []) leitores.add(uid);
+  await db.collection("aulas").doc(aulaId).update({ leitores: [...leitores] });
 }
 
 /** Marca o login como participante (a aula passa a aparecer nas listas dele). */

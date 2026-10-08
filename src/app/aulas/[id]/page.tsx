@@ -3,7 +3,8 @@ import Link from "next/link";
 import { db } from "@/lib/firebase-admin";
 import { fromDoc, type Aula, type Disciplina, type VadeMecumFavorito } from "@/lib/firestore";
 import { requireUser } from "@/lib/auth";
-import { buscarMinhaAnotacao, participaDaAula, textoDaAnotacao } from "@/lib/anotacoes";
+import { buscarCompartilhadasComigo, buscarMinhaAnotacao, podeVerAula, textoDaAnotacao } from "@/lib/anotacoes";
+import { listarColegas } from "@/lib/colegas";
 import {
   updateAula,
   deleteAula,
@@ -35,14 +36,16 @@ export default async function AulaDetailPage({
   const aulaDoc = await db.collection("aulas").doc(id).get();
   if (!aulaDoc.exists) notFound();
   const aulaBase = fromDoc<Aula>(aulaDoc);
-  // Cada login só enxerga as aulas de que participa.
-  if (!participaDaAula(aulaBase, user.uid)) notFound();
+  // Cada login só enxerga as aulas de que participa ou que um colega compartilhou com ele.
+  if (!podeVerAula(aulaBase, user.uid)) notFound();
 
-  const [disciplinaDoc, favoritosSnap, minhaAnotacao] = await Promise.all([
+  const [disciplinaDoc, favoritosSnap, minhaAnotacao, compartilhadasComigo, colegas] = await Promise.all([
     db.collection("disciplinas").doc(aulaBase.disciplinaId).get(),
     // Favoritos do Vade Mecum são de cada um.
     db.collection("vademecum_favoritos").where("aulaId", "==", id).where("uid", "==", user.uid).get(),
     buscarMinhaAnotacao(id, user.uid),
+    buscarCompartilhadasComigo(id, user.uid),
+    listarColegas(user.uid),
   ]);
 
   if (!disciplinaDoc.exists) notFound();
@@ -85,19 +88,51 @@ export default async function AulaDetailPage({
         <ShareButton aulaId={aula.id} title={aula.tema} className="btn-primary" />
       </div>
 
+      {compartilhadasComigo.length > 0 && (
+        <section className="card flex flex-col gap-3">
+          <h2 className="font-semibold flex items-center gap-2">
+            <span className="icon-badge bg-purple-600/10 text-purple-700 dark:text-purple-400">📥</span>
+            Compartilhado com você
+          </h2>
+          {compartilhadasComigo.map((nota) => (
+            <details key={nota.id} className="disclosure rounded-lg bg-black/[.03] dark:bg-white/[.04]" open>
+              <summary className="px-3 py-2 text-sm font-medium text-foreground/80">De {nota.nome}</summary>
+              <div className="px-3 pb-3 flex flex-col gap-3">
+                {nota.resumo && (
+                  <div>
+                    <p className="section-title mb-1">📝 Anotações</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{nota.resumo}</p>
+                  </div>
+                )}
+                {nota.anotacoesLousa && (
+                  <div>
+                    <p className="section-title mb-1">🧑‍🏫 Lousa</p>
+                    <p className="lousa-leitura">{nota.anotacoesLousa}</p>
+                  </div>
+                )}
+              </div>
+            </details>
+          ))}
+        </section>
+      )}
+
       <section id="minhas-anotacoes" className="card flex flex-col gap-3 scroll-mt-24">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold flex items-center gap-2">
             <span className="icon-badge bg-blue-600/10 text-blue-700 dark:text-blue-400">📝</span>
             Minhas anotações
           </h2>
-          <span className="text-xs text-foreground/50 text-right">🔒 Só você vê</span>
+          <span className="text-xs text-foreground/50 text-right">
+            {minhaAnotacao?.compartilhadoCom?.length ? "👥 compartilhada" : "🔒 Só você vê"}
+          </span>
         </div>
         <EditorAnotacao
           action={salvarAnotacaoPessoal.bind(null, aula.id)}
           resumoInicial={minhaAnotacao?.resumo ?? ""}
           lousaInicial={minhaAnotacao?.anotacoesLousa ?? ""}
           titulo={`${aula.disciplina.nome} — ${aula.tema}`}
+          colegas={colegas}
+          compartilhadoComInicial={minhaAnotacao?.compartilhadoCom ?? []}
         />
       </section>
 
