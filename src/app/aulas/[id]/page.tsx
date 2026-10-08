@@ -56,15 +56,6 @@ export default async function AulaDetailPage({
   const temConteudoCompartilhado = temLegado || notasDosColegas.length > 0 || Boolean(aula.resumoIA);
   const textoParaCards = aula.resumoIA || textoCompartilhadoParaIA(aula, notasCompartilhadas);
 
-  const textoParaCompartilhar = [
-    `${aula.disciplina.nome} — ${aula.tema}`,
-    [aula.resumo, aula.anotacoesLousa].filter(Boolean).join("\n") || null,
-    minhaAnotacao ? [minhaAnotacao.resumo, minhaAnotacao.anotacoesLousa].filter(Boolean).join("\n") : null,
-    ...notasDosColegas.map((nota) => [nota.resumo, nota.anotacoesLousa].filter(Boolean).join("\n")),
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -85,7 +76,7 @@ export default async function AulaDetailPage({
         <Link href={`/aulas/${aula.id}/imprimir`} className="btn-primary">
           🖨️ Ver / Salvar em PDF
         </Link>
-        <ShareButton title={aula.tema} text={textoParaCompartilhar} className="btn-primary" />
+        <ShareButton aulaId={aula.id} title={aula.tema} className="btn-primary" />
       </div>
 
       <section id="minhas-anotacoes" className="card flex flex-col gap-3 scroll-mt-24">

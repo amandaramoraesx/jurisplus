@@ -26,17 +26,6 @@ async function anotacoesVisiveis(aulaId: string, uid: string): Promise<AnotacaoP
     .filter((nota) => nota.uid === uid || nota.compartilhado);
 }
 
-function textoParaCompartilhar(aula: AulaComNotasVisiveis) {
-  const partes = [`${aula.disciplina?.nome ?? "Aula"} — ${aula.tema} (${formatDate(aula.data)})`];
-  if (aula.resumo) partes.push(aula.resumo);
-  if (aula.anotacoesLousa) partes.push(aula.anotacoesLousa);
-  for (const nota of aula.notasVisiveis) {
-    if (nota.resumo) partes.push(nota.resumo);
-    if (nota.anotacoesLousa) partes.push(nota.anotacoesLousa);
-  }
-  return partes.join("\n\n");
-}
-
 function BlocoTexto({ resumo, lousa }: { resumo: string | null; lousa: string | null }) {
   return (
     <div className="flex flex-col gap-3">
@@ -149,7 +138,7 @@ function NotaCard({ aula, uid }: { aula: AulaComNotasVisiveis; uid: string }) {
           <Link href={`/aulas/${aula.id}/imprimir`} className="btn-ghost">
             🖨️ PDF
           </Link>
-          <ShareButton title={aula.tema} text={textoParaCompartilhar(aula)} />
+          <ShareButton aulaId={aula.id} title={aula.tema} />
         </div>
       </div>
     </details>
